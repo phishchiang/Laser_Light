@@ -38,4 +38,7 @@ export const objectUniformConfig = {
     u_p2_X: { size: 1, offset: 21, },
     u_p2_Y: { size: 1, offset: 22, },
     u_p2_Z: { size: 1, offset: 23, },
+    u_p3_X: { size: 1, offset: 24, },
+    u_p3_Y: { size: 1, offset: 25, },
+    u_p3_Z: { size: 1, offset: 26, },
 };

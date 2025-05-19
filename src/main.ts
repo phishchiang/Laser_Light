@@ -5,7 +5,6 @@ import { ArcballCamera, WASDCamera } from './camera';
 import { createInputHandler } from './input';
 import { loadAndProcessGLB } from './loadAndProcessGLB';
 import { sceneUniformConfig, objectUniformConfig } from './uniformConfig';
-// import { Scene } from './Scene';
 import { PipelineBuilder } from './PipelineBuilder';
 
 const MESH_PATH = '/assets/meshes/lightEdge.glb';
@@ -33,6 +32,9 @@ export class WebGPUApp{
     u_p2_X: number;
     u_p2_Y: number;
     u_p2_Z: number;
+    u_p3_X: number;
+    u_p3_Y: number;
+    u_p3_Z: number;
   } = {
     type: 'arcball',
     uTestValue: 1.0,
@@ -43,6 +45,9 @@ export class WebGPUApp{
     u_p2_X: -1,
     u_p2_Y: -1,
     u_p2_Z: 0.0,
+    u_p3_X: 1,
+    u_p3_Y: -1,
+    u_p3_Z: 0.0,
   };
   private uTime: number = 0.0;
   private gui: GUI;
@@ -128,14 +133,14 @@ export class WebGPUApp{
     const leftDown = vec3.add(p2, vec3.scale(right, -halfWidth));
     const rightDown = vec3.add(p2, vec3.scale(right, halfWidth));
 
-    const logicalPositions = [rightUp, leftUp, leftDown, rightUp, leftDown, rightDown];
+    const vertexOrder = [rightUp, leftUp, leftDown, rightUp, leftDown, rightDown];
 
     const stride = this.loadVertexLayout.arrayStride / 4; // floats per vertex
     console.log(this.loadVertexLayout)
     for (let i = 0; i < 6; i++) {
-      this.interleavedVertexData[i * stride + 0] = logicalPositions[i][0];
-      this.interleavedVertexData[i * stride + 1] = logicalPositions[i][1];
-      this.interleavedVertexData[i * stride + 2] = logicalPositions[i][2];
+      this.interleavedVertexData[i * stride + 0] = vertexOrder[i][0];
+      this.interleavedVertexData[i * stride + 1] = vertexOrder[i][1];
+      this.interleavedVertexData[i * stride + 2] = vertexOrder[i][2];
     }
 
     this.device.queue.writeBuffer( this.loadVerticesBuffer, 0, this.interleavedVertexData.buffer, 0, this.interleavedVertexData.byteLength );
@@ -296,6 +301,22 @@ export class WebGPUApp{
       this.updateFloatUniform( 'u_p2_Z', value );
       this.updateEdgeVertices();
     });
+
+    const u_p3Folder = this.gui.addFolder('3rd Point Position');
+    u_p3Folder.open();
+
+    u_p3Folder.add(this.params, 'u_p3_X', -10, 10).step(0.01).onChange((value) => {
+      this.updateFloatUniform( 'u_p3_X', value );
+      this.updateEdgeVertices();
+    });
+    u_p3Folder.add(this.params, 'u_p3_Y', -10, 10).step(0.01).onChange((value) => {
+      this.updateFloatUniform( 'u_p3_Y', value );
+      this.updateEdgeVertices();
+    });
+    u_p3Folder.add(this.params, 'u_p3_Z', -10, 10).step(0.01).onChange((value) => {
+      this.updateFloatUniform( 'u_p3_Z', value );
+      this.updateEdgeVertices();
+    });
     
   }
 
@@ -325,6 +346,15 @@ export class WebGPUApp{
         break;
       case 'u_p2_Z':
         offset = objectUniformConfig.u_p2_Z.offset * 4;
+        break;
+      case 'u_p3_X':
+        offset = objectUniformConfig.u_p3_X.offset * 4;
+        break;
+      case 'u_p3_Y':
+        offset = objectUniformConfig.u_p3_Y.offset * 4;
+        break;
+      case 'u_p3_Z':
+        offset = objectUniformConfig.u_p3_Z.offset * 4;
         break;
       default:
         console.error(`Unknown key: ${key}`);
@@ -449,11 +479,6 @@ export class WebGPUApp{
     (this.renderPassDescriptor.colorAttachments as GPURenderPassColorAttachment[])[0].view = this.context
     .getCurrentTexture()
     .createView();
-
-    // if press D key, consol.log the camera position
-    if (this.inputHandler().digital.right) {
-      this.initEdgeGeo();
-    }
 
     // Update the depth attachment view
     this.renderPassDescriptor.depthStencilAttachment!.view = this.depthTexture.createView();

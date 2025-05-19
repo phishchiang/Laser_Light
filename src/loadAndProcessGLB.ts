@@ -35,13 +35,13 @@ export async function loadAndProcessGLB(
   const uvs = uvAccessor ? new Float32Array(uvAccessor.getArray()!) : undefined;
   const colors = colorAccessor ? new Float32Array(colorAccessor.getArray()!) : undefined;
 
-  console.log('Original GLB vertex order:');
-  for (let i = 0; i < vertices.length / 3; i++) {
-    const x = vertices[i * 3 + 0];
-    const y = vertices[i * 3 + 1];
-    const z = vertices[i * 3 + 2];
-    console.log(`Vertex ${i}: [${x}, ${y}, ${z}]`);
-  }
+  // console.log('Original GLB vertex order:');
+  // for (let i = 0; i < vertices.length / 3; i++) {
+  //   const x = vertices[i * 3 + 0];
+  //   const y = vertices[i * 3 + 1];
+  //   const z = vertices[i * 3 + 2];
+  //   console.log(`Vertex ${i}: [${x}, ${y}, ${z}]`);
+  // }
 
   // Ensure the number of UVs matches the number of vertices
   if (uvs && uvs.length / 2 !== vertices.length / 3) {
