@@ -4,11 +4,11 @@ import basicWGSL from './basic.wgsl?raw'; // Raw String Import but only specific
 import { ArcballCamera, WASDCamera } from './camera';
 import { createInputHandler } from './input';
 import { loadAndProcessGLB } from './loadAndProcessGLB';
-import { uniformConfig, sceneUniformConfig, objectUniformConfig } from './uniformConfig';
+import { sceneUniformConfig, objectUniformConfig } from './uniformConfig';
 // import { Scene } from './Scene';
 import { PipelineBuilder } from './PipelineBuilder';
 
-const MESH_PATH = '/assets/meshes/light_color.glb';
+const MESH_PATH = '/assets/meshes/lightEdge.glb';
 
 export class WebGPUApp{
   private canvas: HTMLCanvasElement;
@@ -27,10 +27,22 @@ export class WebGPUApp{
     type: 'arcball' | 'WASD'; 
     uTestValue: number; 
     uTestValue_02: number; 
+    u_p1_X: number;
+    u_p1_Y: number;
+    u_p1_Z: number;
+    u_p2_X: number;
+    u_p2_Y: number;
+    u_p2_Z: number;
   } = {
     type: 'arcball',
     uTestValue: 1.0,
     uTestValue_02: 1.0,
+    u_p1_X: 0.0,
+    u_p1_Y: 0.0,
+    u_p1_Z: 0.0,
+    u_p2_X: -1,
+    u_p2_Y: -1,
+    u_p2_Z: 0.0,
   };
   private uTime: number = 0.0;
   private gui: GUI;
@@ -50,6 +62,7 @@ export class WebGPUApp{
   private sampler!: GPUSampler;
   private newCameraType!: string;
   private oldCameraType!: string;
+  private interleavedVertexData!: Float32Array;
   private inputHandler!: () => { 
     digital: { forward: boolean, backward: boolean, left: boolean, right: boolean, up: boolean, down: boolean, };
     analog: { x: number; y: number; zoom: number; touching: boolean };
@@ -82,7 +95,7 @@ export class WebGPUApp{
   public async setupAndRender() {
     await this.initializeWebGPU();
     await this.initLoadAndProcessGLB();
-    this.initVertexBuffer();
+    this.initUniformBuffer();
     await this.loadTexture();
     this.initCam();
     this.initPipelineBindGrp(this.presentationFormat);
@@ -91,13 +104,52 @@ export class WebGPUApp{
     this.renderFrame();
   }
 
+  private updateEdgeVertices() {
+    // Get GUI points
+    const p1 = vec3.create(this.params.u_p1_X, this.params.u_p1_Y, this.params.u_p1_Z);
+    const p2 = vec3.create(this.params.u_p2_X, this.params.u_p2_Y, this.params.u_p2_Z);
+
+    // Compute direction and right vector for width
+    const upDir = vec3.normalize(vec3.subtract(p2, p1));
+    // Use camera position to get a normal
+    const cameraPos = this.cameras[this.params.type].position;
+    const center = vec3.scale(vec3.add(p1, p2), 0.5);
+    const toCamera = vec3.normalize(vec3.subtract(cameraPos, center));
+    const right = vec3.normalize(vec3.cross(upDir, toCamera));
+
+    // Set half width (adjust to your mesh's original half-width)
+    const halfWidth = 0.05;
+
+    // Calculate four corners
+    // Top edge (p1)
+    const leftUp = vec3.add(p1, vec3.scale(right, -halfWidth));
+    const rightUp = vec3.add(p1, vec3.scale(right, halfWidth));
+    // Bottom edge (p2)
+    const leftDown = vec3.add(p2, vec3.scale(right, -halfWidth));
+    const rightDown = vec3.add(p2, vec3.scale(right, halfWidth));
+
+    const logicalPositions = [rightUp, leftUp, leftDown, rightUp, leftDown, rightDown];
+
+    const stride = this.loadVertexLayout.arrayStride / 4; // floats per vertex
+    console.log(this.loadVertexLayout)
+    for (let i = 0; i < 6; i++) {
+      this.interleavedVertexData[i * stride + 0] = logicalPositions[i][0];
+      this.interleavedVertexData[i * stride + 1] = logicalPositions[i][1];
+      this.interleavedVertexData[i * stride + 2] = logicalPositions[i][2];
+    }
+
+    this.device.queue.writeBuffer( this.loadVerticesBuffer, 0, this.interleavedVertexData.buffer, 0, this.interleavedVertexData.byteLength );
+  }
+
   private async initLoadAndProcessGLB() {
-    const { vertexBuffer, indexBuffer, indexCount, vertexLayout } = await loadAndProcessGLB(this.device, MESH_PATH);
+    const { vertexBuffer, indexBuffer, indexCount, vertexLayout, interleavedData } = await loadAndProcessGLB(this.device, MESH_PATH);
   
     this.loadVerticesBuffer = vertexBuffer;
     this.loadIndexBuffer = indexBuffer;
     this.loadIndexCount = indexCount;
     this.loadVertexLayout = vertexLayout;
+    this.interleavedVertexData = interleavedData;
+    console.log(vertexBuffer);
   }
 
   private initCam(){
@@ -128,7 +180,7 @@ export class WebGPUApp{
     );
   }
 
-  private initVertexBuffer() {
+  private initUniformBuffer() {
     // Calculate the total size for scene-level uniforms
     const sceneUniformTotalSize = Object.values(sceneUniformConfig)
     .reduce((sum, item) => sum + item.size, 0);
@@ -169,8 +221,8 @@ export class WebGPUApp{
     // Write data to the uniform buffer
     this.device.queue.writeBuffer(this.sceneUniformBuffer, 0, sceneUniformData.buffer, 0, sceneUniformData.byteLength);
     this.device.queue.writeBuffer(this.objectUniformBuffer, 0, objectUniformData.buffer, 0, objectUniformData.byteLength);
-    console.log(sceneUniformData);
-    console.log(objectUniformData);
+
+    // console.log('Object Uniform Buffer:', objectUniformData);
   }
 
   private setupEventListeners() {
@@ -205,17 +257,44 @@ export class WebGPUApp{
   }
 
   private initializeGUI() {
-    this.gui.add(this.params, 'type', ['arcball', 'WASD']).onChange(() => {
-      this.newCameraType = this.params.type;
-      this.cameras[this.newCameraType].matrix = this.cameras[this.oldCameraType].matrix;
-      this.oldCameraType = this.newCameraType
-    });
     
     this.gui.add(this.params, 'uTestValue', 0.0, 1.0).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'uTestValue', value );
     });
     this.gui.add(this.params, 'uTestValue_02', 0.0, 1.0).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'uTestValue_02', value );
+    });
+
+    const u_p1Folder = this.gui.addFolder('1st Point Position');
+    u_p1Folder.open();
+
+    u_p1Folder.add(this.params, 'u_p1_X', -10, 10).step(0.01).onChange((value) => {
+      this.updateFloatUniform( 'u_p1_X', value );
+      this.updateEdgeVertices();
+    });
+    u_p1Folder.add(this.params, 'u_p1_Y', -10, 10).step(0.01).onChange((value) => {
+      this.updateFloatUniform( 'u_p1_Y', value );
+      this.updateEdgeVertices();
+    });
+    u_p1Folder.add(this.params, 'u_p1_Z', -10, 10).step(0.01).onChange((value) => {
+      this.updateFloatUniform( 'u_p1_Z', value );
+      this.updateEdgeVertices();
+    });
+
+    const u_p2Folder = this.gui.addFolder('2nd Point Position');
+    u_p2Folder.open();
+
+    u_p2Folder.add(this.params, 'u_p2_X', -10, 10).step(0.01).onChange((value) => {
+      this.updateFloatUniform( 'u_p2_X', value );
+      this.updateEdgeVertices();
+    });
+    u_p2Folder.add(this.params, 'u_p2_Y', -10, 10).step(0.01).onChange((value) => {
+      this.updateFloatUniform( 'u_p2_Y', value );
+      this.updateEdgeVertices();
+    });
+    u_p2Folder.add(this.params, 'u_p2_Z', -10, 10).step(0.01).onChange((value) => {
+      this.updateFloatUniform( 'u_p2_Z', value );
+      this.updateEdgeVertices();
     });
     
   }
@@ -229,7 +308,24 @@ export class WebGPUApp{
       case 'uTestValue_02':
         offset = objectUniformConfig.uTestValue_02.offset * 4;;
         break;
-      // Add more cases as needed
+      case 'u_p1_X':
+        offset = objectUniformConfig.u_p1_X.offset * 4;
+        break;
+      case 'u_p1_Y':
+        offset = objectUniformConfig.u_p1_Y.offset * 4;
+        break;
+      case 'u_p1_Z':
+        offset = objectUniformConfig.u_p1_Z.offset * 4;
+        break;
+      case 'u_p2_X':
+        offset = objectUniformConfig.u_p2_X.offset * 4;
+        break;
+      case 'u_p2_Y':
+        offset = objectUniformConfig.u_p2_Y.offset * 4;
+        break;
+      case 'u_p2_Z':
+        offset = objectUniformConfig.u_p2_Z.offset * 4;
+        break;
       default:
         console.error(`Unknown key: ${key}`);
         return;
@@ -353,6 +449,11 @@ export class WebGPUApp{
     (this.renderPassDescriptor.colorAttachments as GPURenderPassColorAttachment[])[0].view = this.context
     .getCurrentTexture()
     .createView();
+
+    // if press D key, consol.log the camera position
+    if (this.inputHandler().digital.right) {
+      this.initEdgeGeo();
+    }
 
     // Update the depth attachment view
     this.renderPassDescriptor.depthStencilAttachment!.view = this.depthTexture.createView();

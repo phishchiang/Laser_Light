@@ -9,6 +9,7 @@ export async function loadAndProcessGLB(
   indexBuffer: GPUBuffer;
   indexCount: number;
   vertexLayout: { arrayStride: number; attributes: GPUVertexAttribute[] };
+  interleavedData: Float32Array;
 }> {
   const io = new NodeIO();
   const response = await fetch(url);
@@ -33,6 +34,14 @@ export async function loadAndProcessGLB(
   const vertexNormal = normalAccessor ? new Float32Array(normalAccessor.getArray()!) : undefined;
   const uvs = uvAccessor ? new Float32Array(uvAccessor.getArray()!) : undefined;
   const colors = colorAccessor ? new Float32Array(colorAccessor.getArray()!) : undefined;
+
+  console.log('Original GLB vertex order:');
+  for (let i = 0; i < vertices.length / 3; i++) {
+    const x = vertices[i * 3 + 0];
+    const y = vertices[i * 3 + 1];
+    const z = vertices[i * 3 + 2];
+    console.log(`Vertex ${i}: [${x}, ${y}, ${z}]`);
+  }
 
   // Ensure the number of UVs matches the number of vertices
   if (uvs && uvs.length / 2 !== vertices.length / 3) {
@@ -70,10 +79,12 @@ export async function loadAndProcessGLB(
     }
   }
 
+  console.log('Interleaved Data:', interleavedData);
+
   // Create a GPUBuffer for the loaded vertices
   const vertexBuffer = device.createBuffer({
     size: interleavedData.byteLength,
-    usage: GPUBufferUsage.VERTEX,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST, 
     mappedAtCreation: true,
   });
   new Float32Array(vertexBuffer.getMappedRange()).set(interleavedData);
@@ -93,5 +104,6 @@ export async function loadAndProcessGLB(
     indexBuffer,
     indexCount: indices!.length,
     vertexLayout,
+    interleavedData,
   };
 }
