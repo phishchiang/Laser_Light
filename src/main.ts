@@ -53,7 +53,8 @@ export class WebGPUApp{
   private gui: GUI;
   private lastFrameMS: number;
   private demoVerticesBuffer!: GPUBuffer;
-  private loadVerticesBuffer!: GPUBuffer;
+  private sideLine_01_VerticesBuffer!: GPUBuffer;
+  private sideLine_02_VerticesBuffer!: GPUBuffer;
   private loadIndexBuffer!: GPUBuffer;
   private loadIndexCount!: number;
   private uniformBuffer!: GPUBuffer;
@@ -67,7 +68,8 @@ export class WebGPUApp{
   private sampler!: GPUSampler;
   private newCameraType!: string;
   private oldCameraType!: string;
-  private interleavedVertexData!: Float32Array;
+  private sideLine_01_interVertexData!: Float32Array;
+  private sideLine_02_interVertexData!: Float32Array;
   private inputHandler!: () => { 
     digital: { forward: boolean, backward: boolean, left: boolean, right: boolean, up: boolean, down: boolean, };
     analog: { x: number; y: number; zoom: number; touching: boolean };
@@ -138,22 +140,87 @@ export class WebGPUApp{
     const stride = this.loadVertexLayout.arrayStride / 4; // floats per vertex
     console.log(this.loadVertexLayout)
     for (let i = 0; i < 6; i++) {
-      this.interleavedVertexData[i * stride + 0] = vertexOrder[i][0];
-      this.interleavedVertexData[i * stride + 1] = vertexOrder[i][1];
-      this.interleavedVertexData[i * stride + 2] = vertexOrder[i][2];
+      this.sideLine_01_interVertexData[i * stride + 0] = vertexOrder[i][0];
+      this.sideLine_01_interVertexData[i * stride + 1] = vertexOrder[i][1];
+      this.sideLine_01_interVertexData[i * stride + 2] = vertexOrder[i][2];
     }
 
-    this.device.queue.writeBuffer( this.loadVerticesBuffer, 0, this.interleavedVertexData.buffer, 0, this.interleavedVertexData.byteLength );
+    this.device.queue.writeBuffer( this.sideLine_01_VerticesBuffer, 0, this.sideLine_01_interVertexData.buffer, 0, this.sideLine_01_interVertexData.byteLength );
   }
+
+  private updateEdgeVertices2() {
+  const p1 = vec3.create(this.params.u_p1_X, this.params.u_p1_Y, this.params.u_p1_Z);
+  const p3 = vec3.create(this.params.u_p3_X, this.params.u_p3_Y, this.params.u_p3_Z);
+
+  const upDir = vec3.normalize(vec3.subtract(p3, p1));
+  const cameraPos = this.cameras[this.params.type].position;
+  const center = vec3.scale(vec3.add(p1, p3), 0.5);
+  const toCamera = vec3.normalize(vec3.subtract(cameraPos, center));
+  const right = vec3.normalize(vec3.cross(upDir, toCamera));
+  const halfWidth = 0.05;
+
+  const leftUp = vec3.add(p1, vec3.scale(right, -halfWidth));
+  const rightUp = vec3.add(p1, vec3.scale(right, halfWidth));
+  const leftDown = vec3.add(p3, vec3.scale(right, -halfWidth));
+  const rightDown = vec3.add(p3, vec3.scale(right, halfWidth));
+
+  const logicalPositions = [rightUp, leftUp, leftDown, rightUp, leftDown, rightDown];
+  const stride = this.loadVertexLayout.arrayStride / 4;
+
+  for (let i = 0; i < 6; i++) {
+    this.sideLine_02_interVertexData[i * stride + 0] = logicalPositions[i][0];
+    this.sideLine_02_interVertexData[i * stride + 1] = logicalPositions[i][1];
+    this.sideLine_02_interVertexData[i * stride + 2] = logicalPositions[i][2];
+  }
+
+  this.device.queue.writeBuffer(
+    this.sideLine_02_VerticesBuffer,
+    0,
+    this.sideLine_02_interVertexData.buffer,
+    0,
+    this.sideLine_02_interVertexData.byteLength
+  );
+}
 
   private async initLoadAndProcessGLB() {
     const { vertexBuffer, indexBuffer, indexCount, vertexLayout, interleavedData } = await loadAndProcessGLB(this.device, MESH_PATH);
-  
-    this.loadVerticesBuffer = vertexBuffer;
+    
+    // For mesh 1
+    this.sideLine_01_interVertexData = new Float32Array(interleavedData); // Make a copy
+    this.sideLine_01_VerticesBuffer = this.device.createBuffer({
+      size: this.sideLine_01_interVertexData.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    this.device.queue.writeBuffer(
+      this.sideLine_01_VerticesBuffer,
+      0,
+      this.sideLine_01_interVertexData.buffer,
+      0,
+      this.sideLine_01_interVertexData.byteLength
+    );
+
+    // For mesh 2
+    this.sideLine_02_interVertexData = new Float32Array(interleavedData); // Make a copy
+    this.sideLine_02_VerticesBuffer = this.device.createBuffer({
+      size: this.sideLine_02_interVertexData.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    this.device.queue.writeBuffer(
+      this.sideLine_02_VerticesBuffer,
+      0,
+      this.sideLine_02_interVertexData.buffer,
+      0,
+      this.sideLine_02_interVertexData.byteLength
+    );
+
+    // this.sideLine_01_VerticesBuffer = vertexBuffer;
     this.loadIndexBuffer = indexBuffer;
     this.loadIndexCount = indexCount;
     this.loadVertexLayout = vertexLayout;
-    this.interleavedVertexData = interleavedData;
+    // this.sideLine_01_interVertexData = interleavedData;
+    
+    // this.sideLine_02_VerticesBuffer = vertexBuffer;
+    // this.sideLine_02_interVertexData = interleavedData;
     console.log(vertexBuffer);
   }
 
@@ -276,14 +343,17 @@ export class WebGPUApp{
     u_p1Folder.add(this.params, 'u_p1_X', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p1_X', value );
       this.updateEdgeVertices();
+      this.updateEdgeVertices2();
     });
     u_p1Folder.add(this.params, 'u_p1_Y', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p1_Y', value );
       this.updateEdgeVertices();
+      this.updateEdgeVertices2();
     });
     u_p1Folder.add(this.params, 'u_p1_Z', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p1_Z', value );
       this.updateEdgeVertices();
+      this.updateEdgeVertices2();
     });
 
     const u_p2Folder = this.gui.addFolder('2nd Point Position');
@@ -307,15 +377,15 @@ export class WebGPUApp{
 
     u_p3Folder.add(this.params, 'u_p3_X', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p3_X', value );
-      this.updateEdgeVertices();
+      this.updateEdgeVertices2();
     });
     u_p3Folder.add(this.params, 'u_p3_Y', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p3_Y', value );
-      this.updateEdgeVertices();
+      this.updateEdgeVertices2();
     });
     u_p3Folder.add(this.params, 'u_p3_Z', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p3_Z', value );
-      this.updateEdgeVertices();
+      this.updateEdgeVertices2();
     });
     
   }
@@ -489,9 +559,16 @@ export class WebGPUApp{
     // passEncoder.setBindGroup(0, this.uniformBindGroup);
     passEncoder.setBindGroup(0, this.sceneUniformBindGroup); // Scene-level uniforms
     passEncoder.setBindGroup(1, this.objectUniformBindGroup); // Object-level uniforms
-    passEncoder.setVertexBuffer(0, this.loadVerticesBuffer);
+
+    passEncoder.setVertexBuffer(0, this.sideLine_01_VerticesBuffer);
     passEncoder.setIndexBuffer(this.loadIndexBuffer, 'uint16');
     passEncoder.draw(this.loadIndexCount);
+
+    // Draw the second mesh
+    passEncoder.setVertexBuffer(0, this.sideLine_02_VerticesBuffer);
+    passEncoder.setIndexBuffer(this.loadIndexBuffer, 'uint16');
+    passEncoder.draw(this.loadIndexCount);
+
     passEncoder.end();
     this.device.queue.submit([commandEncoder.finish()]);
 
