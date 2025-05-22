@@ -42,6 +42,7 @@ export async function loadAndProcessGLB(
   //   const z = vertices[i * 3 + 2];
   //   console.log(`Vertex ${i}: [${x}, ${y}, ${z}]`);
   // }
+  console.log('Original GLB vertex order:', indices);
 
   // Ensure the number of UVs matches the number of vertices
   if (uvs && uvs.length / 2 !== vertices.length / 3) {
@@ -91,8 +92,12 @@ export async function loadAndProcessGLB(
   vertexBuffer.unmap();
 
   // Create index buffer
+
+  // Pad index buffer size to next multiple of 4
+  const paddedIndexBufferSize = Math.ceil(indices!.byteLength / 4) * 4;
+
   const indexBuffer = device.createBuffer({
-    size: indices!.byteLength,
+    size: paddedIndexBufferSize,
     usage: GPUBufferUsage.INDEX,
     mappedAtCreation: true,
   });

@@ -8,6 +8,7 @@ import { sceneUniformConfig, objectUniformConfig } from './uniformConfig';
 import { PipelineBuilder } from './PipelineBuilder';
 
 const MESH_PATH = '/assets/meshes/lightEdge.glb';
+const LIGHT_TRI_PATH = '/assets/meshes/lightTri.glb';
 
 export class WebGPUApp{
   private canvas: HTMLCanvasElement;
@@ -70,6 +71,11 @@ export class WebGPUApp{
   private oldCameraType!: string;
   private sideLine_01_interVertexData!: Float32Array;
   private sideLine_02_interVertexData!: Float32Array;
+  private tri_interVertexData!: Float32Array;
+  private tri_VerticesBuffer!: GPUBuffer;
+  private tri_IndexBuffer!: GPUBuffer;
+  private tri_IndexCount!: number;
+  private tri_VertexLayout!: { arrayStride: number; attributes: GPUVertexAttribute[] };
   private inputHandler!: () => { 
     digital: { forward: boolean, backward: boolean, left: boolean, right: boolean, up: boolean, down: boolean, };
     analog: { x: number; y: number; zoom: number; touching: boolean };
@@ -111,7 +117,7 @@ export class WebGPUApp{
     this.renderFrame();
   }
 
-  private updateEdgeVertices() {
+  private updateEdgeVertices_01() {
     // Get GUI points
     const p1 = vec3.create(this.params.u_p1_X, this.params.u_p1_Y, this.params.u_p1_Z);
     const p2 = vec3.create(this.params.u_p2_X, this.params.u_p2_Y, this.params.u_p2_Z);
@@ -148,7 +154,7 @@ export class WebGPUApp{
     this.device.queue.writeBuffer( this.sideLine_01_VerticesBuffer, 0, this.sideLine_01_interVertexData.buffer, 0, this.sideLine_01_interVertexData.byteLength );
   }
 
-  private updateEdgeVertices2() {
+  private updateEdgeVertices_02() {
   const p1 = vec3.create(this.params.u_p1_X, this.params.u_p1_Y, this.params.u_p1_Z);
   const p3 = vec3.create(this.params.u_p3_X, this.params.u_p3_Y, this.params.u_p3_Z);
 
@@ -164,13 +170,13 @@ export class WebGPUApp{
   const leftDown = vec3.add(p3, vec3.scale(right, -halfWidth));
   const rightDown = vec3.add(p3, vec3.scale(right, halfWidth));
 
-  const logicalPositions = [rightUp, leftUp, leftDown, rightUp, leftDown, rightDown];
+  const vertexOrder = [rightUp, leftUp, leftDown, rightUp, leftDown, rightDown];
   const stride = this.loadVertexLayout.arrayStride / 4;
 
   for (let i = 0; i < 6; i++) {
-    this.sideLine_02_interVertexData[i * stride + 0] = logicalPositions[i][0];
-    this.sideLine_02_interVertexData[i * stride + 1] = logicalPositions[i][1];
-    this.sideLine_02_interVertexData[i * stride + 2] = logicalPositions[i][2];
+    this.sideLine_02_interVertexData[i * stride + 0] = vertexOrder[i][0];
+    this.sideLine_02_interVertexData[i * stride + 1] = vertexOrder[i][1];
+    this.sideLine_02_interVertexData[i * stride + 2] = vertexOrder[i][2];
   }
 
   this.device.queue.writeBuffer(
@@ -183,10 +189,16 @@ export class WebGPUApp{
 }
 
   private async initLoadAndProcessGLB() {
-    const { vertexBuffer, indexBuffer, indexCount, vertexLayout, interleavedData } = await loadAndProcessGLB(this.device, MESH_PATH);
-    
+    const {   
+      vertexBuffer: edgeVertexBuffer,
+      indexBuffer: edgeIndexBuffer,
+      indexCount: edgeIndexCount,
+      vertexLayout: edgeVertexLayout,
+      interleavedData: edgeInterleavedData
+    } = await loadAndProcessGLB(this.device, MESH_PATH);
+
     // For mesh 1
-    this.sideLine_01_interVertexData = new Float32Array(interleavedData); // Make a copy
+    this.sideLine_01_interVertexData = new Float32Array(edgeInterleavedData); // Make a copy
     this.sideLine_01_VerticesBuffer = this.device.createBuffer({
       size: this.sideLine_01_interVertexData.byteLength,
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
@@ -200,7 +212,7 @@ export class WebGPUApp{
     );
 
     // For mesh 2
-    this.sideLine_02_interVertexData = new Float32Array(interleavedData); // Make a copy
+    this.sideLine_02_interVertexData = new Float32Array(edgeInterleavedData); // Make a copy
     this.sideLine_02_VerticesBuffer = this.device.createBuffer({
       size: this.sideLine_02_interVertexData.byteLength,
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
@@ -213,15 +225,34 @@ export class WebGPUApp{
       this.sideLine_02_interVertexData.byteLength
     );
 
-    // this.sideLine_01_VerticesBuffer = vertexBuffer;
-    this.loadIndexBuffer = indexBuffer;
-    this.loadIndexCount = indexCount;
-    this.loadVertexLayout = vertexLayout;
-    // this.sideLine_01_interVertexData = interleavedData;
-    
-    // this.sideLine_02_VerticesBuffer = vertexBuffer;
-    // this.sideLine_02_interVertexData = interleavedData;
-    console.log(vertexBuffer);
+    this.loadIndexBuffer = edgeIndexBuffer;
+    this.loadIndexCount = edgeIndexCount;
+    this.loadVertexLayout = edgeVertexLayout;
+
+    // Load the triangle mesh
+    const {
+      vertexBuffer: triVertexBuffer,
+      indexBuffer: triIndexBuffer,
+      indexCount: triIndexCount,
+      vertexLayout: triVertexLayout,
+      interleavedData: triInterleavedData
+    } = await loadAndProcessGLB(this.device, LIGHT_TRI_PATH);
+
+    this.tri_interVertexData = new Float32Array(triInterleavedData); // Make a copy
+    this.tri_VerticesBuffer = this.device.createBuffer({
+      size: this.tri_interVertexData.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    this.device.queue.writeBuffer(
+      this.tri_VerticesBuffer,
+      0,
+      this.tri_interVertexData.buffer,
+      0,
+      this.tri_interVertexData.byteLength
+    );
+    this.tri_IndexBuffer = triIndexBuffer;
+    this.tri_IndexCount = triIndexCount;
+    this.tri_VertexLayout = triVertexLayout;
   }
 
   private initCam(){
@@ -342,18 +373,18 @@ export class WebGPUApp{
 
     u_p1Folder.add(this.params, 'u_p1_X', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p1_X', value );
-      this.updateEdgeVertices();
-      this.updateEdgeVertices2();
+      this.updateEdgeVertices_01();
+      this.updateEdgeVertices_02();
     });
     u_p1Folder.add(this.params, 'u_p1_Y', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p1_Y', value );
-      this.updateEdgeVertices();
-      this.updateEdgeVertices2();
+      this.updateEdgeVertices_01();
+      this.updateEdgeVertices_02();
     });
     u_p1Folder.add(this.params, 'u_p1_Z', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p1_Z', value );
-      this.updateEdgeVertices();
-      this.updateEdgeVertices2();
+      this.updateEdgeVertices_01();
+      this.updateEdgeVertices_02();
     });
 
     const u_p2Folder = this.gui.addFolder('2nd Point Position');
@@ -361,15 +392,15 @@ export class WebGPUApp{
 
     u_p2Folder.add(this.params, 'u_p2_X', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p2_X', value );
-      this.updateEdgeVertices();
+      this.updateEdgeVertices_01();
     });
     u_p2Folder.add(this.params, 'u_p2_Y', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p2_Y', value );
-      this.updateEdgeVertices();
+      this.updateEdgeVertices_01();
     });
     u_p2Folder.add(this.params, 'u_p2_Z', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p2_Z', value );
-      this.updateEdgeVertices();
+      this.updateEdgeVertices_01();
     });
 
     const u_p3Folder = this.gui.addFolder('3rd Point Position');
@@ -377,15 +408,15 @@ export class WebGPUApp{
 
     u_p3Folder.add(this.params, 'u_p3_X', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p3_X', value );
-      this.updateEdgeVertices2();
+      this.updateEdgeVertices_02();
     });
     u_p3Folder.add(this.params, 'u_p3_Y', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p3_Y', value );
-      this.updateEdgeVertices2();
+      this.updateEdgeVertices_02();
     });
     u_p3Folder.add(this.params, 'u_p3_Z', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p3_Z', value );
-      this.updateEdgeVertices2();
+      this.updateEdgeVertices_02();
     });
     
   }
@@ -489,8 +520,8 @@ export class WebGPUApp{
       basicWGSL,
       basicWGSL,
       {
-          arrayStride: this.loadVertexLayout.arrayStride,
-          attributes: this.loadVertexLayout.attributes,
+        arrayStride: this.loadVertexLayout.arrayStride,
+        attributes: this.loadVertexLayout.attributes,
       }
     );
 
