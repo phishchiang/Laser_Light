@@ -2,14 +2,12 @@ import { NodeIO } from '@gltf-transform/core';
 import { getVertexLayout } from './getVertexLayout';
 
 export async function loadAndProcessGLB(
-  device: GPUDevice,
   url: string
 ): Promise<{
-  vertexBuffer: GPUBuffer;
-  indexBuffer: GPUBuffer;
+  interleavedData: Float32Array;
+  indices: Uint16Array | undefined;
   indexCount: number;
   vertexLayout: { arrayStride: number; attributes: GPUVertexAttribute[] };
-  interleavedData: Float32Array;
 }> {
   const io = new NodeIO();
   const response = await fetch(url);
@@ -42,7 +40,6 @@ export async function loadAndProcessGLB(
   //   const z = vertices[i * 3 + 2];
   //   console.log(`Vertex ${i}: [${x}, ${y}, ${z}]`);
   // }
-  console.log('Original GLB vertex order:', indices);
 
   // Ensure the number of UVs matches the number of vertices
   if (uvs && uvs.length / 2 !== vertices.length / 3) {
@@ -80,35 +77,10 @@ export async function loadAndProcessGLB(
     }
   }
 
-  console.log('Interleaved Data:', interleavedData);
-
-  // Create a GPUBuffer for the loaded vertices
-  const vertexBuffer = device.createBuffer({
-    size: interleavedData.byteLength,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST, 
-    mappedAtCreation: true,
-  });
-  new Float32Array(vertexBuffer.getMappedRange()).set(interleavedData);
-  vertexBuffer.unmap();
-
-  // Create index buffer
-
-  // Pad index buffer size to next multiple of 4
-  const paddedIndexBufferSize = Math.ceil(indices!.byteLength / 4) * 4;
-
-  const indexBuffer = device.createBuffer({
-    size: paddedIndexBufferSize,
-    usage: GPUBufferUsage.INDEX,
-    mappedAtCreation: true,
-  });
-  new Uint16Array(indexBuffer.getMappedRange()).set(indices!);
-  indexBuffer.unmap();
-
   return {
-    vertexBuffer,
-    indexBuffer,
+    interleavedData,
+    indices,
     indexCount: indices!.length,
     vertexLayout,
-    interleavedData,
   };
 }

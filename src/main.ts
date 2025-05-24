@@ -57,7 +57,7 @@ export class WebGPUApp{
   private demoVerticesBuffer!: GPUBuffer;
   private sideLine_01_VerticesBuffer!: GPUBuffer;
   private sideLine_02_VerticesBuffer!: GPUBuffer;
-  private loadIndexBuffer!: GPUBuffer;
+  private loadIndexBuffer!: GPUBuffer | undefined;
   private loadIndexCount!: number;
   private uniformBuffer!: GPUBuffer;
   private sceneUniformBuffer!: GPUBuffer;
@@ -74,7 +74,7 @@ export class WebGPUApp{
   private sideLine_02_interVertexData!: Float32Array;
   private tri_interVertexData!: Float32Array;
   private tri_VerticesBuffer!: GPUBuffer;
-  private tri_IndexBuffer!: GPUBuffer;
+  private tri_IndexBuffer!: GPUBuffer | undefined;
   private tri_IndexCount!: number;
   private tri_VertexLayout!: { arrayStride: number; attributes: GPUVertexAttribute[] };
   private inputHandler!: () => { 
@@ -191,12 +191,11 @@ export class WebGPUApp{
 
   private async initLoadAndProcessGLB() {
     const {   
-      vertexBuffer: edgeVertexBuffer,
-      indexBuffer: edgeIndexBuffer,
+      interleavedData: edgeInterleavedData,
+      indices: edgeIndexData,
       indexCount: edgeIndexCount,
-      vertexLayout: edgeVertexLayout,
-      interleavedData: edgeInterleavedData
-    } = await loadAndProcessGLB(this.device, MESH_PATH);
+      vertexLayout: edgeVertexLayout
+    } = await loadAndProcessGLB( MESH_PATH);
 
     // For mesh 1
     this.sideLine_01_interVertexData = new Float32Array(edgeInterleavedData); // Make a copy
@@ -226,18 +225,34 @@ export class WebGPUApp{
       this.sideLine_02_interVertexData.byteLength
     );
 
-    this.loadIndexBuffer = edgeIndexBuffer;
+    // Create index buffer if indices exist
+    let indexBuffer: GPUBuffer | undefined = undefined;
+    if (edgeIndexData) {
+      // Create index buffer
+      // Pad index buffer size to next multiple of 4 for avoiding alignment issues
+      // WebGPU requires buffer sizes to be a multiple of 4 bytes
+      const paddedIndexBufferSize = Math.ceil(edgeIndexData.byteLength / 4) * 4;
+
+      indexBuffer = this.device.createBuffer({
+        size: paddedIndexBufferSize,
+        usage: GPUBufferUsage.INDEX,
+        mappedAtCreation: true,
+      });
+      new Uint16Array(indexBuffer.getMappedRange()).set(edgeIndexData);
+      indexBuffer.unmap();
+    }
+
+    this.loadIndexBuffer = indexBuffer;
     this.loadIndexCount = edgeIndexCount;
     this.loadVertexLayout = edgeVertexLayout;
 
     // Load the triangle mesh
     const {
-      vertexBuffer: triVertexBuffer,
-      indexBuffer: triIndexBuffer,
+      interleavedData: triInterleavedData,
+      indices: triIndexData,
       indexCount: triIndexCount,
-      vertexLayout: triVertexLayout,
-      interleavedData: triInterleavedData
-    } = await loadAndProcessGLB(this.device, LIGHT_TRI_PATH);
+      vertexLayout: triVertexLayout
+    } = await loadAndProcessGLB(LIGHT_TRI_PATH);
 
     this.tri_interVertexData = new Float32Array(triInterleavedData); // Make a copy
     this.tri_VerticesBuffer = this.device.createBuffer({
@@ -251,7 +266,23 @@ export class WebGPUApp{
       0,
       this.tri_interVertexData.byteLength
     );
-    this.tri_IndexBuffer = triIndexBuffer;
+
+    if (triIndexData) {
+      // Create index buffer
+      // Pad index buffer size to next multiple of 4 for avoiding alignment issues
+      // WebGPU requires buffer sizes to be a multiple of 4 bytes
+      const paddedIndexBufferSize = Math.ceil(triIndexData.byteLength / 4) * 4;
+
+      indexBuffer = this.device.createBuffer({
+        size: paddedIndexBufferSize,
+        usage: GPUBufferUsage.INDEX,
+        mappedAtCreation: true,
+      });
+      new Uint16Array(indexBuffer.getMappedRange()).set(triIndexData);
+      indexBuffer.unmap();
+    }
+
+    this.tri_IndexBuffer = indexBuffer;
     this.tri_IndexCount = triIndexCount;
     this.tri_VertexLayout = triVertexLayout;
   }
@@ -605,12 +636,12 @@ export class WebGPUApp{
     passEncoder.setBindGroup(1, this.objectUniformBindGroup); // Object-level uniforms
 
     passEncoder.setVertexBuffer(0, this.sideLine_01_VerticesBuffer);
-    passEncoder.setIndexBuffer(this.loadIndexBuffer, 'uint16');
+    passEncoder.setIndexBuffer(this.loadIndexBuffer!, 'uint16');
     passEncoder.draw(this.loadIndexCount);
 
     // Draw the second mesh
     passEncoder.setVertexBuffer(0, this.sideLine_02_VerticesBuffer);
-    passEncoder.setIndexBuffer(this.loadIndexBuffer, 'uint16');
+    passEncoder.setIndexBuffer(this.loadIndexBuffer!, 'uint16');
     passEncoder.draw(this.loadIndexCount);
 
     // Draw the triangle mesh
@@ -618,7 +649,7 @@ export class WebGPUApp{
     passEncoder.setBindGroup(0, this.sceneUniformBindGroup); // Scene-level uniforms
     passEncoder.setBindGroup(1, this.objectUniformBindGroup); // Object-level uniforms
     passEncoder.setVertexBuffer(0, this.tri_VerticesBuffer);
-    passEncoder.setIndexBuffer(this.tri_IndexBuffer, 'uint16');
+    passEncoder.setIndexBuffer(this.tri_IndexBuffer!, 'uint16');
     passEncoder.draw(this.tri_IndexCount);
 
     passEncoder.end();
