@@ -156,36 +156,64 @@ export class WebGPUApp{
   }
 
   private updateEdgeVertices_02() {
-  const p1 = vec3.create(this.params.u_p1_X, this.params.u_p1_Y, this.params.u_p1_Z);
-  const p3 = vec3.create(this.params.u_p3_X, this.params.u_p3_Y, this.params.u_p3_Z);
+    const p1 = vec3.create(this.params.u_p1_X, this.params.u_p1_Y, this.params.u_p1_Z);
+    const p3 = vec3.create(this.params.u_p3_X, this.params.u_p3_Y, this.params.u_p3_Z);
 
-  const upDir = vec3.normalize(vec3.subtract(p3, p1));
-  const cameraPos = this.cameras[this.params.type].position;
-  const center = vec3.scale(vec3.add(p1, p3), 0.5);
-  const toCamera = vec3.normalize(vec3.subtract(cameraPos, center));
-  const right = vec3.normalize(vec3.cross(upDir, toCamera));
-  const halfWidth = 0.05;
+    const upDir = vec3.normalize(vec3.subtract(p3, p1));
+    const cameraPos = this.cameras[this.params.type].position;
+    const center = vec3.scale(vec3.add(p1, p3), 0.5);
+    const toCamera = vec3.normalize(vec3.subtract(cameraPos, center));
+    const right = vec3.normalize(vec3.cross(upDir, toCamera));
+    const halfWidth = 0.05;
 
-  const leftUp = vec3.add(p1, vec3.scale(right, -halfWidth));
-  const rightUp = vec3.add(p1, vec3.scale(right, halfWidth));
-  const leftDown = vec3.add(p3, vec3.scale(right, -halfWidth));
-  const rightDown = vec3.add(p3, vec3.scale(right, halfWidth));
+    const leftUp = vec3.add(p1, vec3.scale(right, -halfWidth));
+    const rightUp = vec3.add(p1, vec3.scale(right, halfWidth));
+    const leftDown = vec3.add(p3, vec3.scale(right, -halfWidth));
+    const rightDown = vec3.add(p3, vec3.scale(right, halfWidth));
 
-  const vertexOrder = [rightUp, leftUp, leftDown, rightUp, leftDown, rightDown];
-  const stride = this.loadVertexLayout.arrayStride / 4;
+    const vertexOrder = [rightUp, leftUp, leftDown, rightUp, leftDown, rightDown];
+    const stride = this.loadVertexLayout.arrayStride / 4;
 
-  for (let i = 0; i < 6; i++) {
-    this.sideLine_02_interVertexData[i * stride + 0] = vertexOrder[i][0];
-    this.sideLine_02_interVertexData[i * stride + 1] = vertexOrder[i][1];
-    this.sideLine_02_interVertexData[i * stride + 2] = vertexOrder[i][2];
+    for (let i = 0; i < 6; i++) {
+      this.sideLine_02_interVertexData[i * stride + 0] = vertexOrder[i][0];
+      this.sideLine_02_interVertexData[i * stride + 1] = vertexOrder[i][1];
+      this.sideLine_02_interVertexData[i * stride + 2] = vertexOrder[i][2];
+    }
+
+    this.device.queue.writeBuffer(
+      this.sideLine_02_VerticesBuffer,
+      0,
+      this.sideLine_02_interVertexData.buffer,
+      0,
+      this.sideLine_02_interVertexData.byteLength
+    );
   }
 
+  private updateTriVertices() {
+  // Get GUI points
+  const p1 = vec3.create(this.params.u_p1_X, this.params.u_p1_Y, this.params.u_p1_Z); // top
+  const p2 = vec3.create(this.params.u_p2_X, this.params.u_p2_Y, this.params.u_p2_Z); // bottom left
+  const p3 = vec3.create(this.params.u_p3_X, this.params.u_p3_Y, this.params.u_p3_Z); // bottom right
+
+  // The order here must match your GLB's original vertex order!
+  // For a typical triangle: [top, bottom left, bottom right]
+  const positions = [p2, p3, p1];
+
+  const stride = this.tri_VertexLayout.arrayStride / 4; // floats per vertex
+
+  for (let i = 0; i < 3; i++) {
+    this.tri_interVertexData[i * stride + 0] = positions[i][0];
+    this.tri_interVertexData[i * stride + 1] = positions[i][1];
+    this.tri_interVertexData[i * stride + 2] = positions[i][2];
+  }
+
+  // Upload to GPU
   this.device.queue.writeBuffer(
-    this.sideLine_02_VerticesBuffer,
+    this.tri_VerticesBuffer,
     0,
-    this.sideLine_02_interVertexData.buffer,
+    this.tri_interVertexData.buffer,
     0,
-    this.sideLine_02_interVertexData.byteLength
+    this.tri_interVertexData.byteLength
   );
 }
 
@@ -407,16 +435,19 @@ export class WebGPUApp{
       this.updateFloatUniform( 'u_p1_X', value );
       this.updateEdgeVertices_01();
       this.updateEdgeVertices_02();
+      this.updateTriVertices();
     });
     u_p1Folder.add(this.params, 'u_p1_Y', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p1_Y', value );
       this.updateEdgeVertices_01();
       this.updateEdgeVertices_02();
+      this.updateTriVertices();
     });
     u_p1Folder.add(this.params, 'u_p1_Z', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p1_Z', value );
       this.updateEdgeVertices_01();
       this.updateEdgeVertices_02();
+      this.updateTriVertices();
     });
 
     const u_p2Folder = this.gui.addFolder('2nd Point Position');
@@ -425,14 +456,17 @@ export class WebGPUApp{
     u_p2Folder.add(this.params, 'u_p2_X', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p2_X', value );
       this.updateEdgeVertices_01();
+      this.updateTriVertices();
     });
     u_p2Folder.add(this.params, 'u_p2_Y', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p2_Y', value );
       this.updateEdgeVertices_01();
+      this.updateTriVertices();
     });
     u_p2Folder.add(this.params, 'u_p2_Z', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p2_Z', value );
       this.updateEdgeVertices_01();
+      this.updateTriVertices();
     });
 
     const u_p3Folder = this.gui.addFolder('3rd Point Position');
@@ -441,14 +475,17 @@ export class WebGPUApp{
     u_p3Folder.add(this.params, 'u_p3_X', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p3_X', value );
       this.updateEdgeVertices_02();
+      this.updateTriVertices();
     });
     u_p3Folder.add(this.params, 'u_p3_Y', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p3_Y', value );
       this.updateEdgeVertices_02();
+      this.updateTriVertices();
     });
     u_p3Folder.add(this.params, 'u_p3_Z', -10, 10).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'u_p3_Z', value );
       this.updateEdgeVertices_02();
+      this.updateTriVertices();
     });
     
   }
