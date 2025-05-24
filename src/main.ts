@@ -190,32 +190,32 @@ export class WebGPUApp{
   }
 
   private updateTriVertices() {
-  // Get GUI points
-  const p1 = vec3.create(this.params.u_p1_X, this.params.u_p1_Y, this.params.u_p1_Z); // top
-  const p2 = vec3.create(this.params.u_p2_X, this.params.u_p2_Y, this.params.u_p2_Z); // bottom left
-  const p3 = vec3.create(this.params.u_p3_X, this.params.u_p3_Y, this.params.u_p3_Z); // bottom right
+    // Get GUI points
+    const p1 = vec3.create(this.params.u_p1_X, this.params.u_p1_Y, this.params.u_p1_Z); // top
+    const p2 = vec3.create(this.params.u_p2_X, this.params.u_p2_Y, this.params.u_p2_Z); // bottom left
+    const p3 = vec3.create(this.params.u_p3_X, this.params.u_p3_Y, this.params.u_p3_Z); // bottom right
 
-  // The order here must match your GLB's original vertex order!
-  // For a typical triangle: [top, bottom left, bottom right]
-  const positions = [p2, p3, p1];
+    // The order here must match your GLB's original vertex order!
+    // For a typical triangle: [top, bottom left, bottom right]
+    const positions = [p2, p3, p1];
 
-  const stride = this.tri_VertexLayout.arrayStride / 4; // floats per vertex
+    const stride = this.tri_VertexLayout.arrayStride / 4; // floats per vertex
 
-  for (let i = 0; i < 3; i++) {
-    this.tri_interVertexData[i * stride + 0] = positions[i][0];
-    this.tri_interVertexData[i * stride + 1] = positions[i][1];
-    this.tri_interVertexData[i * stride + 2] = positions[i][2];
+    for (let i = 0; i < 3; i++) {
+      this.tri_interVertexData[i * stride + 0] = positions[i][0];
+      this.tri_interVertexData[i * stride + 1] = positions[i][1];
+      this.tri_interVertexData[i * stride + 2] = positions[i][2];
+    }
+
+    // Upload to GPU
+    this.device.queue.writeBuffer(
+      this.tri_VerticesBuffer,
+      0,
+      this.tri_interVertexData.buffer,
+      0,
+      this.tri_interVertexData.byteLength
+    );
   }
-
-  // Upload to GPU
-  this.device.queue.writeBuffer(
-    this.tri_VerticesBuffer,
-    0,
-    this.tri_interVertexData.buffer,
-    0,
-    this.tri_interVertexData.byteLength
-  );
-}
 
   private async initLoadAndProcessGLB() {
     const {   
@@ -313,6 +313,10 @@ export class WebGPUApp{
     this.tri_IndexBuffer = indexBuffer;
     this.tri_IndexCount = triIndexCount;
     this.tri_VertexLayout = triVertexLayout;
+
+    this.updateEdgeVertices_01();
+    this.updateEdgeVertices_02();
+    this.updateTriVertices();
   }
 
   private initCam(){
