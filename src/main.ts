@@ -15,6 +15,7 @@ export class WebGPUApp{
   private device!: GPUDevice;
   private context!: GPUCanvasContext;
   private pipeline!: GPURenderPipeline;
+  private triPipeline!: GPURenderPipeline;
   private presentationFormat!: GPUTextureFormat;
   private uniformBindGroup!: GPUBindGroup;
   private sceneUniformBindGroup!: GPUBindGroup;
@@ -527,6 +528,18 @@ export class WebGPUApp{
 
     this.pipeline = pipeline;
 
+    // Triangle mesh pipeline
+    const { pipeline: triPipeline } = pipelineBuilder.createPipeline(
+      presentationFormat,
+      basicWGSL,
+      basicWGSL,
+      {
+        arrayStride: this.tri_VertexLayout.arrayStride,
+        attributes: this.tri_VertexLayout.attributes,
+      }
+    );
+    this.triPipeline = triPipeline;
+
     // Create the scene-level uniform bind group
     this.sceneUniformBindGroup = this.device.createBindGroup({
       layout: sceneBindGroupLayout,
@@ -599,6 +612,14 @@ export class WebGPUApp{
     passEncoder.setVertexBuffer(0, this.sideLine_02_VerticesBuffer);
     passEncoder.setIndexBuffer(this.loadIndexBuffer, 'uint16');
     passEncoder.draw(this.loadIndexCount);
+
+    // Draw the triangle mesh
+    passEncoder.setPipeline(this.triPipeline);
+    passEncoder.setBindGroup(0, this.sceneUniformBindGroup); // Scene-level uniforms
+    passEncoder.setBindGroup(1, this.objectUniformBindGroup); // Object-level uniforms
+    passEncoder.setVertexBuffer(0, this.tri_VerticesBuffer);
+    passEncoder.setIndexBuffer(this.tri_IndexBuffer, 'uint16');
+    passEncoder.draw(this.tri_IndexCount);
 
     passEncoder.end();
     this.device.queue.submit([commandEncoder.finish()]);
