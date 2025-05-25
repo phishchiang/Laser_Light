@@ -9,7 +9,8 @@ export class PipelineBuilder {
     presentationFormat: GPUTextureFormat,
     vertexShaderCode: string,
     fragmentShaderCode: string,
-    vertexLayout: GPUVertexBufferLayout
+    vertexLayout: GPUVertexBufferLayout,
+    blend?: GPUBlendState 
   ): {
     pipeline: GPURenderPipeline;
     sceneBindGroupLayout: GPUBindGroupLayout;
@@ -49,29 +50,30 @@ export class PipelineBuilder {
 
       // Create the pipeline layout with both bind group layouts
       const pipelineLayout = this.device.createPipelineLayout({
-          bindGroupLayouts: [sceneBindGroupLayout, objectBindGroupLayout],
+        bindGroupLayouts: [sceneBindGroupLayout, objectBindGroupLayout],
       });
 
       // Create the render pipeline
       const pipeline = this.device.createRenderPipeline({
         layout: pipelineLayout,
         vertex: {
-            module: this.device.createShaderModule({
-                code: vertexShaderCode,
-            }),
-            entryPoint: 'vertex_main',
-            buffers: [vertexLayout],
+          module: this.device.createShaderModule({
+            code: vertexShaderCode,
+          }),
+          entryPoint: 'vertex_main',
+          buffers: [vertexLayout],
         },
         fragment: {
-            module: this.device.createShaderModule({
-                code: fragmentShaderCode,
-            }),
-            entryPoint: 'fragment_main',
-            targets: [
-                {
-                    format: presentationFormat,
-                },
-            ],
+          module: this.device.createShaderModule({
+            code: fragmentShaderCode,
+          }),
+          entryPoint: 'fragment_main',
+          targets: [
+            {
+              format: presentationFormat,
+              blend: blend,
+            },
+          ],
         },
         primitive: {
           topology: 'triangle-list',

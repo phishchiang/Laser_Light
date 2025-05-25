@@ -609,6 +609,18 @@ export class WebGPUApp{
       {
         arrayStride: this.tri_VertexLayout.arrayStride,
         attributes: this.tri_VertexLayout.attributes,
+      },
+      {
+        color: {
+          srcFactor: 'src-alpha',
+          dstFactor: 'one-minus-src-alpha',
+          operation: 'add',
+        },
+        alpha: {
+          srcFactor: 'one',
+          dstFactor: 'one-minus-src-alpha',
+          operation: 'add',
+        },
       }
     );
     this.triPipeline = triPipeline;

@@ -124,10 +124,15 @@ fn fragment_main(input: FragmentInput) -> @location(0) vec4f {
 
   // Animate along Z for turbulence
   let noisePos = input.frag_worldPosition * 5.0 + vec3f(0.0, sceneUniforms.uTime * 0.5, sceneUniforms.uTime * 0.16);
-  let noiseValue = fbm(noisePos);
+  var noiseValue = fbm(noisePos);
+
+  // apply power to noise value
+  noiseValue = pow(noiseValue, objectUniforms.uTestValue * 1.0); // Uncomment to apply power to the noise value
+
+  let UVGradientMul = noiseValue * (1.0 - input.frag_uv.y);
 
   var finalColor: vec4f = textureSample(myTexture, mySampler, input.frag_uv);
   // finalColor = vec4f(input.frag_worldPosition.x, input.frag_worldPosition.y, input.frag_worldPosition.z, 1.0);
-  finalColor = vec4f(noiseValue, noiseValue, noiseValue, 1.0);
+  finalColor = vec4f(UVGradientMul, UVGradientMul, UVGradientMul, UVGradientMul);
   return finalColor;
 }
