@@ -1,6 +1,7 @@
 import { mat4, vec3 } from 'wgpu-matrix';
 import { GUI } from 'dat.gui';
 import basicWGSL from './basic.wgsl?raw'; // Raw String Import but only specific to Vite.
+import triNoiseWGSL from './triNoise.wgsl?raw'; 
 import { ArcballCamera, WASDCamera } from './camera';
 import { createInputHandler } from './input';
 import { loadAndProcessGLB } from './loadAndProcessGLB';
@@ -603,8 +604,8 @@ export class WebGPUApp{
     // Triangle mesh pipeline
     const { pipeline: triPipeline } = pipelineBuilder.createPipeline(
       presentationFormat,
-      basicWGSL,
-      basicWGSL,
+      triNoiseWGSL,
+      triNoiseWGSL,
       {
         arrayStride: this.tri_VertexLayout.arrayStride,
         attributes: this.tri_VertexLayout.attributes,
