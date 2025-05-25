@@ -66,15 +66,27 @@ fn valueNoise3D(p: vec3f) -> f32 {
   return mix(y0, y1, u.z);
 }
 
+// Add a Direction Array for Each Octave
+const octaveDirs = array<vec3f, 5>(
+  vec3f(1.0, 0.5, 0.0),
+  vec3f(-0.7, 1.0, 0.2),
+  vec3f(0.3, -0.6, 1.0),
+  vec3f(-1.0, 0.2, -0.5),
+  vec3f(0.5, -1.0, 0.7)
+);
+
 // fBM (fractional Brownian motion)
 fn fbm(p: vec3f) -> f32 {
   var value = 0.0;
   var amplitude = 0.5;
   var frequency = 1.0;
   for (var i = 0; i < 5; i = i + 1) {
-      value = value + amplitude * valueNoise3D(p * frequency);
-      frequency = frequency * 2.0;
-      amplitude = amplitude * 0.5;
+    // Animate each octave in a different direction and speed
+    let timeOffset = sceneUniforms.uTime * (0.2 + 0.15 * f32(i));
+    let animatedP = p * frequency + octaveDirs[i] * timeOffset;
+    value = value + amplitude * valueNoise3D(animatedP);
+    frequency = frequency * 2.0;
+    amplitude = amplitude * 0.5;
   }
   return value;
 }
@@ -111,7 +123,7 @@ fn fragment_main(input: FragmentInput) -> @location(0) vec4f {
   // let noisePos = vec3f(input.frag_uv*5.0, sceneUniforms.uTime * 0.5); // Use the UV from GLB
 
   // Animate along Z for turbulence
-  let noisePos = input.frag_worldPosition * 5.0 + vec3f(0.0, sceneUniforms.uTime * 0.5, sceneUniforms.uTime * 0.12);
+  let noisePos = input.frag_worldPosition * 5.0 + vec3f(0.0, sceneUniforms.uTime * 0.5, sceneUniforms.uTime * 0.16);
   let noiseValue = fbm(noisePos);
 
   var finalColor: vec4f = textureSample(myTexture, mySampler, input.frag_uv);
