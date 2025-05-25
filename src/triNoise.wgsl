@@ -72,7 +72,7 @@ fn vertex_main(input: VertexInput) -> VertexOutput {
     1.0, 0.0, 0.0, 0.0,  // Scale X by 1.0
     0.0, 1.0, 0.0, 0.0,  // Scale Y by 1.0
     0.0, 0.0, 1.0, 0.0,  // Scale Z by 1.0
-    0.0, objectUniforms.uTestValue_02, 0.0, 1.0   // Translation along Y-axis
+    0.0, 0.0, objectUniforms.uTestValue_02, 1.0   
   );
 
   var transformedModelMatrix = objectUniforms.modelMatrix * translateYMatrix;
@@ -95,11 +95,14 @@ struct FragmentInput {
 
 @fragment
 fn fragment_main(input: FragmentInput) -> @location(0) vec4f {
-  let noisePos = vec3f(input.frag_uv*5.0, sceneUniforms.uTime * 0.5); // Animate along Z
+  // let noisePos = vec3f(input.frag_uv*5.0, sceneUniforms.uTime * 0.5); // Use the UV from GLB
+
+  // Use world position as the noise coordinate, animate along Z
+  let noisePos = input.frag_worldPosition * 3.0 + vec3f(0.0, 0.0, sceneUniforms.uTime * 0.0); 
   let noiseValue = valueNoise3D(noisePos);
 
   var finalColor: vec4f = textureSample(myTexture, mySampler, input.frag_uv);
-  // finalColor = vec4f(noiseValue, noiseValue, noiseValue, 1.0);
-  finalColor = vec4f(input.frag_worldPosition.x, input.frag_worldPosition.y, input.frag_worldPosition.z, 1.0);
+  // finalColor = vec4f(input.frag_worldPosition.x, input.frag_worldPosition.y, input.frag_worldPosition.z, 1.0);
+  finalColor = vec4f(noiseValue, noiseValue, noiseValue, 1.0);
   return finalColor;
 }
