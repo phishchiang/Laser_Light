@@ -66,6 +66,19 @@ fn valueNoise3D(p: vec3f) -> f32 {
   return mix(y0, y1, u.z);
 }
 
+// fBM (fractional Brownian motion)
+fn fbm(p: vec3f) -> f32 {
+  var value = 0.0;
+  var amplitude = 0.5;
+  var frequency = 1.0;
+  for (var i = 0; i < 5; i = i + 1) {
+      value = value + amplitude * valueNoise3D(p * frequency);
+      frequency = frequency * 2.0;
+      amplitude = amplitude * 0.5;
+  }
+  return value;
+}
+
 @vertex
 fn vertex_main(input: VertexInput) -> VertexOutput {
   let translateYMatrix = mat4x4<f32>(
@@ -97,9 +110,9 @@ struct FragmentInput {
 fn fragment_main(input: FragmentInput) -> @location(0) vec4f {
   // let noisePos = vec3f(input.frag_uv*5.0, sceneUniforms.uTime * 0.5); // Use the UV from GLB
 
-  // Use world position as the noise coordinate, animate along Z
-  let noisePos = input.frag_worldPosition * 3.0 + vec3f(0.0, 0.0, sceneUniforms.uTime * 0.0); 
-  let noiseValue = valueNoise3D(noisePos);
+  // Animate along Z for turbulence
+  let noisePos = input.frag_worldPosition * 5.0 + vec3f(0.0, sceneUniforms.uTime * 0.5, sceneUniforms.uTime * 0.12);
+  let noiseValue = fbm(noisePos);
 
   var finalColor: vec4f = textureSample(myTexture, mySampler, input.frag_uv);
   // finalColor = vec4f(input.frag_worldPosition.x, input.frag_worldPosition.y, input.frag_worldPosition.z, 1.0);
