@@ -29,6 +29,12 @@ export class WebGPUApp{
     type: 'arcball' | 'WASD'; 
     uTestValue: number; 
     uTestValue_02: number; 
+    all_translate_X: number;
+    all_translate_Y: number;
+    all_translate_Z: number;
+    all_rotate_X: number;
+    all_rotate_Y: number;
+    all_rotate_Z: number;
     u_p1_X: number;
     u_p1_Y: number;
     u_p1_Z: number;
@@ -42,6 +48,12 @@ export class WebGPUApp{
     type: 'arcball',
     uTestValue: 1.0,
     uTestValue_02: 1.0,
+    all_translate_X: 0,
+    all_translate_Y: 0,
+    all_translate_Z: 0,
+    all_rotate_X: 0,
+    all_rotate_Y: 0,
+    all_rotate_Z: 0,
     u_p1_X: 0.0,
     u_p1_Y: 0.0,
     u_p1_Z: 0.0,
@@ -119,10 +131,38 @@ export class WebGPUApp{
     this.renderFrame();
   }
 
+  private getGlobalTransformMatrix(): Float32Array {
+    // Start with identity
+    let m = mat4.identity();
+
+    // Apply rotations (order: X, Y, Z)
+    m = mat4.rotateX(m, this.params.all_rotate_X);
+    m = mat4.rotateY(m, this.params.all_rotate_Y);
+    m = mat4.rotateZ(m, this.params.all_rotate_Z);
+
+    // Apply translation
+    m = mat4.translate(m, [
+      this.params.all_translate_X,
+      this.params.all_translate_Y,
+      this.params.all_translate_Z
+    ]);
+
+    return m;
+  }
+
+  private transformPoint(point: Float32Array, matrix: Float32Array): Float32Array {
+    return vec3.transformMat4(point, matrix);
+  }
+
   private updateEdgeVertices_01() {
     // Get GUI points
-    const p1 = vec3.create(this.params.u_p1_X, this.params.u_p1_Y, this.params.u_p1_Z);
-    const p2 = vec3.create(this.params.u_p2_X, this.params.u_p2_Y, this.params.u_p2_Z);
+    let p1 = vec3.create(this.params.u_p1_X, this.params.u_p1_Y, this.params.u_p1_Z);
+    let p2 = vec3.create(this.params.u_p2_X, this.params.u_p2_Y, this.params.u_p2_Z);
+
+    // Apply global transform
+    const globalMatrix = this.getGlobalTransformMatrix();
+    p1 = this.transformPoint(p1, globalMatrix);
+    p2 = this.transformPoint(p2, globalMatrix);
 
     // Compute direction and right vector for width
     const upDir = vec3.normalize(vec3.subtract(p2, p1));
@@ -164,8 +204,13 @@ export class WebGPUApp{
   }
 
   private updateEdgeVertices_02() {
-    const p1 = vec3.create(this.params.u_p1_X, this.params.u_p1_Y, this.params.u_p1_Z);
-    const p3 = vec3.create(this.params.u_p3_X, this.params.u_p3_Y, this.params.u_p3_Z);
+    let p1 = vec3.create(this.params.u_p1_X, this.params.u_p1_Y, this.params.u_p1_Z);
+    let p3 = vec3.create(this.params.u_p3_X, this.params.u_p3_Y, this.params.u_p3_Z);
+
+    // Apply global transform
+    const globalMatrix = this.getGlobalTransformMatrix();
+    p1 = this.transformPoint(p1, globalMatrix);
+    p3 = this.transformPoint(p3, globalMatrix);
 
     const upDir = vec3.normalize(vec3.subtract(p3, p1));
     const cameraPos = this.cameras[this.params.type].position;
@@ -206,9 +251,15 @@ export class WebGPUApp{
 
   private updateTriVertices() {
     // Get GUI points
-    const p1 = vec3.create(this.params.u_p1_X, this.params.u_p1_Y, this.params.u_p1_Z); // top
-    const p2 = vec3.create(this.params.u_p2_X, this.params.u_p2_Y, this.params.u_p2_Z); // bottom left
-    const p3 = vec3.create(this.params.u_p3_X, this.params.u_p3_Y, this.params.u_p3_Z); // bottom right
+    let p1 = vec3.create(this.params.u_p1_X, this.params.u_p1_Y, this.params.u_p1_Z); // top
+    let p2 = vec3.create(this.params.u_p2_X, this.params.u_p2_Y, this.params.u_p2_Z); // bottom left
+    let p3 = vec3.create(this.params.u_p3_X, this.params.u_p3_Y, this.params.u_p3_Z); // bottom right
+
+    // Apply global transform
+    const globalMatrix = this.getGlobalTransformMatrix();
+    p1 = this.transformPoint(p1, globalMatrix);
+    p2 = this.transformPoint(p2, globalMatrix);
+    p3 = this.transformPoint(p3, globalMatrix);
 
     // The order here must match your GLB's original vertex order!
     // For a typical triangle: [top, bottom left, bottom right]
@@ -411,7 +462,6 @@ export class WebGPUApp{
     window.addEventListener('resize', this.resize.bind(this));
   }
 
-
   private resize() {
     const devicePixelRatio = window.devicePixelRatio;
     this.canvas.width = this.canvas.clientWidth * devicePixelRatio;
@@ -445,6 +495,40 @@ export class WebGPUApp{
     });
     this.gui.add(this.params, 'uTestValue_02', 0.0, 1.0).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'uTestValue_02', value );
+    });
+
+    const u_allFolder = this.gui.addFolder('All Points Transform');
+    u_allFolder.open();
+
+    u_allFolder.add(this.params, 'all_translate_X', -10, 10).step(0.01).onChange(() => {
+      this.updateEdgeVertices_01();
+      this.updateEdgeVertices_02();
+      this.updateTriVertices();
+    });
+    u_allFolder.add(this.params, 'all_translate_Y', -10, 10).step(0.01).onChange(() => {
+      this.updateEdgeVertices_01();
+      this.updateEdgeVertices_02();
+      this.updateTriVertices();
+    });
+    u_allFolder.add(this.params, 'all_translate_Z', -10, 10).step(0.01).onChange(() => {
+      this.updateEdgeVertices_01();
+      this.updateEdgeVertices_02();
+      this.updateTriVertices();
+    });
+    u_allFolder.add(this.params, 'all_rotate_X', -Math.PI, Math.PI).step(0.01).onChange(() => {
+      this.updateEdgeVertices_01();
+      this.updateEdgeVertices_02();
+      this.updateTriVertices();
+    });
+    u_allFolder.add(this.params, 'all_rotate_Y', -Math.PI, Math.PI).step(0.01).onChange(() => {
+      this.updateEdgeVertices_01();
+      this.updateEdgeVertices_02();
+      this.updateTriVertices();
+    });
+    u_allFolder.add(this.params, 'all_rotate_Z', -Math.PI, Math.PI).step(0.01).onChange(() => {
+      this.updateEdgeVertices_01();
+      this.updateEdgeVertices_02();
+      this.updateTriVertices();
     });
 
     const u_p1Folder = this.gui.addFolder('1st Point Position');
