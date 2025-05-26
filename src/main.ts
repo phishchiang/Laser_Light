@@ -133,15 +133,22 @@ export class WebGPUApp{
     const right = vec3.normalize(vec3.cross(upDir, toCamera));
 
     // Set half width (adjust to your mesh's original half-width)
-    const halfWidth = 0.05;
+    const halfWidth = 0.02;
+
+    // Set the tiny bias value to shift the upper vertices slightly up
+    const upperBias = 0.01;
 
     // Calculate four corners
     // Top edge (p1)
-    const leftUp = vec3.add(p1, vec3.scale(right, -halfWidth));
-    const rightUp = vec3.add(p1, vec3.scale(right, halfWidth));
+    let leftUp = vec3.add(p1, vec3.scale(right, -halfWidth));
+    let rightUp = vec3.add(p1, vec3.scale(right, halfWidth));
     // Bottom edge (p2)
     const leftDown = vec3.add(p2, vec3.scale(right, -halfWidth));
     const rightDown = vec3.add(p2, vec3.scale(right, halfWidth));
+
+    // Adjust the upper vertices slightly up
+    leftUp = vec3.add(leftUp, vec3.scale(upDir, -upperBias));
+    rightUp = vec3.add(rightUp, vec3.scale(upDir, -upperBias));
 
     const vertexOrder = [rightUp, leftUp, leftDown, rightUp, leftDown, rightDown];
 
@@ -165,12 +172,19 @@ export class WebGPUApp{
     const center = vec3.scale(vec3.add(p1, p3), 0.5);
     const toCamera = vec3.normalize(vec3.subtract(cameraPos, center));
     const right = vec3.normalize(vec3.cross(upDir, toCamera));
-    const halfWidth = 0.05;
+    const halfWidth = 0.02;
 
-    const leftUp = vec3.add(p1, vec3.scale(right, -halfWidth));
-    const rightUp = vec3.add(p1, vec3.scale(right, halfWidth));
+    // Set the tiny bias value to shift the upper vertices slightly up
+    const upperBias = 0.01;
+
+    let leftUp = vec3.add(p1, vec3.scale(right, -halfWidth));
+    let rightUp = vec3.add(p1, vec3.scale(right, halfWidth));
     const leftDown = vec3.add(p3, vec3.scale(right, -halfWidth));
     const rightDown = vec3.add(p3, vec3.scale(right, halfWidth));
+
+    // Adjust the upper vertices slightly up
+    leftUp = vec3.add(leftUp, vec3.scale(upDir, -upperBias));
+    rightUp = vec3.add(rightUp, vec3.scale(upDir, -upperBias));
 
     const vertexOrder = [rightUp, leftUp, leftDown, rightUp, leftDown, rightDown];
     const stride = this.loadVertexLayout.arrayStride / 4;
@@ -596,6 +610,18 @@ export class WebGPUApp{
       {
         arrayStride: this.loadVertexLayout.arrayStride,
         attributes: this.loadVertexLayout.attributes,
+      },
+      {
+        color: {
+          srcFactor: 'src-alpha',
+          dstFactor: 'one-minus-src-alpha',
+          operation: 'add',
+        },
+        alpha: {
+          srcFactor: 'one',
+          dstFactor: 'one-minus-src-alpha',
+          operation: 'add',
+        },
       }
     );
 

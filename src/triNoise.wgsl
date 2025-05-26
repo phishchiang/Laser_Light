@@ -122,14 +122,21 @@ struct FragmentInput {
 fn fragment_main(input: FragmentInput) -> @location(0) vec4f {
   // let noisePos = vec3f(input.frag_uv*5.0, sceneUniforms.uTime * 0.5); // Use the UV from GLB
 
+  let center = vec2f(0.5, 1.0);
+  let dist = distance(input.frag_uv, center);
+  var invertVignette = smoothstep(0.0, 1.2, dist);
+  invertVignette = pow(invertVignette, 4.0); // Adjust the power to control vignette strength
+
   // Animate along Z for turbulence
   let noisePos = input.frag_worldPosition * 5.0 + vec3f(0.0, sceneUniforms.uTime * 0.5, sceneUniforms.uTime * 0.16);
   var noiseValue = fbm(noisePos);
 
   // apply power to noise value
-  noiseValue = pow(noiseValue, objectUniforms.uTestValue * 1.0); // Uncomment to apply power to the noise value
+  noiseValue = pow(noiseValue, 1.0); // Uncomment to apply power to the noise value
 
-  let UVGradientMul = noiseValue * (1.0 - input.frag_uv.y);
+  var UVGradientMul = noiseValue * (1.0 - input.frag_uv.y);
+  // UVGradientMul = UVGradientMul + (invertVignette * UVGradientMul);
+  UVGradientMul = UVGradientMul + invertVignette * objectUniforms.uTestValue;
 
   var finalColor: vec4f = textureSample(myTexture, mySampler, input.frag_uv);
   // finalColor = vec4f(input.frag_worldPosition.x, input.frag_worldPosition.y, input.frag_worldPosition.z, 1.0);

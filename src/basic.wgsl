@@ -56,7 +56,13 @@ struct FragmentInput {
 
 @fragment
 fn fragment_main(input: FragmentInput) -> @location(0) vec4f {
-  var finalColor: vec4f = textureSample(myTexture, mySampler, input.frag_uv);
-  finalColor *= objectUniforms.uTestValue;
+  // var finalColor: vec4f = textureSample(myTexture, mySampler, input.frag_uv);
+
+  var UVGradient = pow(1.0 - input.frag_uv.y, 1.5);
+  let centerV = input.frag_uv.x;
+  let centerFade = 1.0 - smoothstep(0.1, 0.5, abs(centerV - 0.5));
+  UVGradient = UVGradient * centerFade;
+
+  var finalColor = vec4f(UVGradient, UVGradient, UVGradient, UVGradient);
   return finalColor;
 }
