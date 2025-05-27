@@ -135,10 +135,13 @@ export class WebGPUApp{
     // Start with identity
     let m = mat4.identity();
 
+    // Helper to convert degrees to radians
+    const deg2rad = (deg: number) => deg * Math.PI / 180;
+
     // Apply rotations (order: X, Y, Z)
-    m = mat4.rotateX(m, this.params.all_rotate_X);
-    m = mat4.rotateY(m, this.params.all_rotate_Y);
-    m = mat4.rotateZ(m, this.params.all_rotate_Z);
+    m = mat4.rotateX(m, deg2rad(this.params.all_rotate_X));
+    m = mat4.rotateY(m, deg2rad(this.params.all_rotate_Y));
+    m = mat4.rotateZ(m, deg2rad(this.params.all_rotate_Z));
 
     // Apply translation
     m = mat4.translate(m, [
@@ -515,17 +518,17 @@ export class WebGPUApp{
       this.updateEdgeVertices_02();
       this.updateTriVertices();
     });
-    u_allFolder.add(this.params, 'all_rotate_X', -Math.PI, Math.PI).step(0.01).onChange(() => {
+    u_allFolder.add(this.params, 'all_rotate_X', -180, 180).step(0.01).onChange(() => {
       this.updateEdgeVertices_01();
       this.updateEdgeVertices_02();
       this.updateTriVertices();
     });
-    u_allFolder.add(this.params, 'all_rotate_Y', -Math.PI, Math.PI).step(0.01).onChange(() => {
+    u_allFolder.add(this.params, 'all_rotate_Y', -180, 180).step(0.01).onChange(() => {
       this.updateEdgeVertices_01();
       this.updateEdgeVertices_02();
       this.updateTriVertices();
     });
-    u_allFolder.add(this.params, 'all_rotate_Z', -Math.PI, Math.PI).step(0.01).onChange(() => {
+    u_allFolder.add(this.params, 'all_rotate_Z', -180, 180).step(0.01).onChange(() => {
       this.updateEdgeVertices_01();
       this.updateEdgeVertices_02();
       this.updateTriVertices();
