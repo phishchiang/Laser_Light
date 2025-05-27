@@ -11,6 +11,8 @@ struct ObjectUniforms {
   modelMatrix : mat4x4<f32>,
   uTestValue : f32,
   uTestValue_02 : f32,
+  uLightIntensity : f32,
+  uLightColor : vec3f,
 };
 
 @group(0) @binding(0) var<uniform> sceneUniforms : SceneUniforms;
@@ -138,8 +140,11 @@ fn fragment_main(input: FragmentInput) -> @location(0) vec4f {
   // UVGradientMul = UVGradientMul + (invertVignette * UVGradientMul);
   UVGradientMul = UVGradientMul + invertVignette * objectUniforms.uTestValue;
 
+  //  Colorizing by the uLightColor
+  let coloringGradient= vec3f(objectUniforms.uLightColor.rgb * UVGradientMul);
+
   var finalColor: vec4f = textureSample(myTexture, mySampler, input.frag_uv);
   // finalColor = vec4f(input.frag_worldPosition.x, input.frag_worldPosition.y, input.frag_worldPosition.z, 1.0);
-  finalColor = vec4f(UVGradientMul, UVGradientMul, UVGradientMul, UVGradientMul);
+  finalColor = vec4f(coloringGradient, UVGradientMul);
   return finalColor;
 }

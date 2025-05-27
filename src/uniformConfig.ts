@@ -32,4 +32,12 @@ export const objectUniformConfig = {
         size: 1,           // Size of the test value (float)
         offset: 17,        // Offset for uTestValue_02 in the uniform buffer
     },
+    uLightIntensity: {
+        size: 1,
+        offset: 18,
+    },
+    uLightColor: {
+        size: 4,
+        offset: 20,
+    },
 };

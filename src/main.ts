@@ -1,6 +1,6 @@
 import { mat4, vec3 } from 'wgpu-matrix';
 import { GUI } from 'dat.gui';
-import basicWGSL from './basic.wgsl?raw'; // Raw String Import but only specific to Vite.
+import edgeLightWGSL from './edgeLight.wgsl?raw'; // Raw String Import but only specific to Vite.
 import triNoiseWGSL from './triNoise.wgsl?raw'; 
 import { ArcballCamera, WASDCamera } from './camera';
 import { createInputHandler } from './input';
@@ -35,6 +35,8 @@ export class WebGPUApp{
     all_rotate_X: number;
     all_rotate_Y: number;
     all_rotate_Z: number;
+    uLightIntensity: number; 
+    uLightColor: [number, number, number]; 
     u_p1_X: number;
     u_p1_Y: number;
     u_p1_Z: number;
@@ -54,6 +56,8 @@ export class WebGPUApp{
     all_rotate_X: 0,
     all_rotate_Y: 0,
     all_rotate_Z: 0,
+    uLightIntensity: 1.0,
+    uLightColor: [255, 255, 255],
     u_p1_X: 0.0,
     u_p1_Y: 0.0,
     u_p1_Z: 0.0,
@@ -453,12 +457,14 @@ export class WebGPUApp{
     objectUniformData.set(this.modelMatrix, objectUniformConfig.modelMatrix.offset);
     objectUniformData.set([this.params.uTestValue], objectUniformConfig.uTestValue.offset);
     objectUniformData.set([this.params.uTestValue_02], objectUniformConfig.uTestValue_02.offset);
+    objectUniformData.set([this.params.uLightIntensity], objectUniformConfig.uLightIntensity.offset);
+    objectUniformData.set(this.params.uLightColor, objectUniformConfig.uLightColor.offset);
 
     // Write data to the uniform buffer
     this.device.queue.writeBuffer(this.sceneUniformBuffer, 0, sceneUniformData.buffer, 0, sceneUniformData.byteLength);
     this.device.queue.writeBuffer(this.objectUniformBuffer, 0, objectUniformData.buffer, 0, objectUniformData.byteLength);
 
-    // console.log('Object Uniform Buffer:', objectUniformData);
+    console.log('Object Uniform Buffer:', objectUniformData);
   }
 
   private setupEventListeners() {
@@ -533,6 +539,17 @@ export class WebGPUApp{
       this.updateEdgeVertices_02();
       this.updateTriVertices();
     });
+    
+    u_allFolder.add(this.params, 'uLightIntensity', 0.0, 10.0).step(0.01).onChange((value) => {
+      this.updateFloatUniform( 'uLightIntensity', value );
+    });
+
+    // Add color picker
+    u_allFolder.addColor(this.params, 'uLightColor').onChange((value) => {
+      const normalizedColor = value.map((v: number) => v / 255.0);
+      const colorArray = new Float32Array(normalizedColor);
+      this.device.queue.writeBuffer( this.objectUniformBuffer, objectUniformConfig.uLightColor.offset * 4, colorArray.buffer, 0, colorArray.byteLength );
+    });
 
     const u_p1Folder = this.gui.addFolder('1st Point Position');
     // u_p1Folder.open();
@@ -596,6 +613,9 @@ export class WebGPUApp{
       case 'uTestValue_02':
         offset = objectUniformConfig.uTestValue_02.offset * 4;;
         break;
+      case 'uLightIntensity':
+        offset = objectUniformConfig.uLightIntensity.offset * 4;
+        break;
       default:
         console.error(`Unknown key: ${key}`);
         return;
@@ -656,8 +676,8 @@ export class WebGPUApp{
 
     const { pipeline, sceneBindGroupLayout, objectBindGroupLayout } = pipelineBuilder.createPipeline(
       presentationFormat,
-      basicWGSL,
-      basicWGSL,
+      edgeLightWGSL,
+      edgeLightWGSL,
       {
         arrayStride: this.loadVertexLayout.arrayStride,
         attributes: this.loadVertexLayout.attributes,

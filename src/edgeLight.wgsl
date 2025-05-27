@@ -11,6 +11,8 @@ struct ObjectUniforms {
   modelMatrix : mat4x4<f32>,
   uTestValue : f32,
   uTestValue_02 : f32,
+  uLightIntensity : f32,
+  uLightColor : vec3f,
 };
 
 @group(0) @binding(0) var<uniform> sceneUniforms : SceneUniforms;
@@ -63,6 +65,9 @@ fn fragment_main(input: FragmentInput) -> @location(0) vec4f {
   let centerFade = 1.0 - smoothstep(0.1, 0.5, abs(centerV - 0.5));
   UVGradient = UVGradient * centerFade;
 
-  var finalColor = vec4f(UVGradient, UVGradient, UVGradient, UVGradient);
+  //  Colorizing by the uLightColor
+  let coloringGradient= vec3f(objectUniforms.uLightColor.rgb * UVGradient);
+
+  var finalColor = vec4f(coloringGradient, UVGradient);
   return finalColor;
 }
