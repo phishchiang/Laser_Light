@@ -534,17 +534,17 @@ export class WebGPUApp{
     const u_p1Folder = this.gui.addFolder('1st Point Position');
     // u_p1Folder.open();
 
-    u_p1Folder.add(this.params, 'u_p1_X', -10, 10).step(0.01).onChange((value) => {
+    u_p1Folder.add(this.params, 'u_p1_X', -10, 10).step(0.01).onChange(() => {
       this.updateEdgeVertices_01();
       this.updateEdgeVertices_02();
       this.updateTriVertices();
     });
-    u_p1Folder.add(this.params, 'u_p1_Y', -10, 10).step(0.01).onChange((value) => {
+    u_p1Folder.add(this.params, 'u_p1_Y', -10, 10).step(0.01).onChange(() => {
       this.updateEdgeVertices_01();
       this.updateEdgeVertices_02();
       this.updateTriVertices();
     });
-    u_p1Folder.add(this.params, 'u_p1_Z', -10, 10).step(0.01).onChange((value) => {
+    u_p1Folder.add(this.params, 'u_p1_Z', -10, 10).step(0.01).onChange(() => {
       this.updateEdgeVertices_01();
       this.updateEdgeVertices_02();
       this.updateTriVertices();
@@ -553,15 +553,15 @@ export class WebGPUApp{
     const u_p2Folder = this.gui.addFolder('2nd Point Position');
     // u_p2Folder.open();
 
-    u_p2Folder.add(this.params, 'u_p2_X', -10, 10).step(0.01).onChange((value) => {
+    u_p2Folder.add(this.params, 'u_p2_X', -10, 10).step(0.01).onChange(() => {
       this.updateEdgeVertices_01();
       this.updateTriVertices();
     });
-    u_p2Folder.add(this.params, 'u_p2_Y', -10, 10).step(0.01).onChange((value) => {
+    u_p2Folder.add(this.params, 'u_p2_Y', -10, 10).step(0.01).onChange(() => {
       this.updateEdgeVertices_01();
       this.updateTriVertices();
     });
-    u_p2Folder.add(this.params, 'u_p2_Z', -10, 10).step(0.01).onChange((value) => {
+    u_p2Folder.add(this.params, 'u_p2_Z', -10, 10).step(0.01).onChange(() => {
       this.updateEdgeVertices_01();
       this.updateTriVertices();
     });
@@ -569,15 +569,15 @@ export class WebGPUApp{
     const u_p3Folder = this.gui.addFolder('3rd Point Position');
     // u_p3Folder.open();
 
-    u_p3Folder.add(this.params, 'u_p3_X', -10, 10).step(0.01).onChange((value) => {
+    u_p3Folder.add(this.params, 'u_p3_X', -10, 10).step(0.01).onChange(() => {
       this.updateEdgeVertices_02();
       this.updateTriVertices();
     });
-    u_p3Folder.add(this.params, 'u_p3_Y', -10, 10).step(0.01).onChange((value) => {
+    u_p3Folder.add(this.params, 'u_p3_Y', -10, 10).step(0.01).onChange(() => {
       this.updateEdgeVertices_02();
       this.updateTriVertices();
     });
-    u_p3Folder.add(this.params, 'u_p3_Z', -10, 10).step(0.01).onChange((value) => {
+    u_p3Folder.add(this.params, 'u_p3_Z', -10, 10).step(0.01).onChange(() => {
       this.updateEdgeVertices_02();
       this.updateTriVertices();
     });
