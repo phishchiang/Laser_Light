@@ -141,10 +141,10 @@ fn fragment_main(input: FragmentInput) -> @location(0) vec4f {
   UVGradientMul = UVGradientMul + invertVignette * objectUniforms.uTestValue;
 
   //  Colorizing by the uLightColor
-  let coloringGradient= vec3f(objectUniforms.uLightColor.rgb * UVGradientMul);
+  let coloringGradient= vec3f(objectUniforms.uLightColor.rgb * UVGradientMul * objectUniforms.uLightIntensity);
 
   var finalColor: vec4f = textureSample(myTexture, mySampler, input.frag_uv);
   // finalColor = vec4f(input.frag_worldPosition.x, input.frag_worldPosition.y, input.frag_worldPosition.z, 1.0);
-  finalColor = vec4f(coloringGradient, UVGradientMul);
+  finalColor = vec4f(coloringGradient, UVGradientMul * objectUniforms.uLightIntensity);
   return finalColor;
 }

@@ -60,13 +60,13 @@ struct FragmentInput {
 fn fragment_main(input: FragmentInput) -> @location(0) vec4f {
   // var finalColor: vec4f = textureSample(myTexture, mySampler, input.frag_uv);
 
-  var UVGradient = pow(1.0 - input.frag_uv.y, 1.5);
+  var UVGradient = pow(1.0 - input.frag_uv.y, 3.5);
   let centerV = input.frag_uv.x;
   let centerFade = 1.0 - smoothstep(0.1, 0.5, abs(centerV - 0.5));
   UVGradient = UVGradient * centerFade;
 
   //  Colorizing by the uLightColor
-  let coloringGradient= vec3f(objectUniforms.uLightColor.rgb * UVGradient);
+  let coloringGradient= vec3f(objectUniforms.uLightColor.rgb * UVGradient * objectUniforms.uLightIntensity);
 
   var finalColor = vec4f(coloringGradient, UVGradient);
   return finalColor;

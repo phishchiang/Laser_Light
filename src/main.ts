@@ -59,7 +59,7 @@ export class WebGPUApp{
     uLightIntensity: 1.0,
     uLightColor: [1, 1, 1],
     u_p1_X: 0.0,
-    u_p1_Y: 0.0,
+    u_p1_Y: 0.5,
     u_p1_Z: 0.0,
     u_p2_X: -1,
     u_p2_Y: -1,
@@ -99,7 +99,7 @@ export class WebGPUApp{
     analog: { x: number; y: number; zoom: number; touching: boolean };
   };
   private static readonly CLEAR_COLOR = [0.1, 0.1, 0.1, 1.0];
-  private static readonly CAMERA_POSITION = vec3.create(3, 2, 5);
+  private static readonly CAMERA_POSITION = vec3.create(0.5, 0, 3);
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -394,7 +394,7 @@ export class WebGPUApp{
 
   private initCam(){
     this.aspect = this.canvas.width / this.canvas.height;
-    this.projectionMatrix = mat4.perspective((2 * Math.PI) / 5, this.aspect, 1, 100.0);
+    this.projectionMatrix = mat4.perspective((2 * Math.PI) / 5, this.aspect, 0.1, 100.0);
     
     const devicePixelRatio = window.devicePixelRatio;
     this.canvas.width = this.canvas.clientWidth * devicePixelRatio;
@@ -509,17 +509,17 @@ export class WebGPUApp{
     const u_allFolder = this.gui.addFolder('All Points Transform');
     u_allFolder.open();
 
-    u_allFolder.add(this.params, 'all_translate_X', -10, 10).step(0.01).onChange(() => {
+    u_allFolder.add(this.params, 'all_translate_X', -3, 3).step(0.001).onChange(() => {
       this.updateEdgeVertices_01();
       this.updateEdgeVertices_02();
       this.updateTriVertices();
     });
-    u_allFolder.add(this.params, 'all_translate_Y', -10, 10).step(0.01).onChange(() => {
+    u_allFolder.add(this.params, 'all_translate_Y', -3, 3).step(0.001).onChange(() => {
       this.updateEdgeVertices_01();
       this.updateEdgeVertices_02();
       this.updateTriVertices();
     });
-    u_allFolder.add(this.params, 'all_translate_Z', -10, 10).step(0.01).onChange(() => {
+    u_allFolder.add(this.params, 'all_translate_Z', -3, 3).step(0.001).onChange(() => {
       this.updateEdgeVertices_01();
       this.updateEdgeVertices_02();
       this.updateTriVertices();
@@ -540,7 +540,7 @@ export class WebGPUApp{
       this.updateTriVertices();
     });
     
-    u_allFolder.add(this.params, 'uLightIntensity', 0.0, 10.0).step(0.01).onChange((value) => {
+    u_allFolder.add(this.params, 'uLightIntensity', 0.0, 1.0).step(0.01).onChange((value) => {
       this.updateFloatUniform( 'uLightIntensity', value );
     });
 
