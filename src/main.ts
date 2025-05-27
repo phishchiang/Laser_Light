@@ -499,12 +499,12 @@ export class WebGPUApp{
 
   private initializeGUI() {
     
-    this.gui.add(this.params, 'uTestValue', 0.0, 1.0).step(0.01).onChange((value) => {
-      this.updateFloatUniform( 'uTestValue', value );
-    });
-    this.gui.add(this.params, 'uTestValue_02', 0.0, 1.0).step(0.01).onChange((value) => {
-      this.updateFloatUniform( 'uTestValue_02', value );
-    });
+    // this.gui.add(this.params, 'uTestValue', 0.0, 1.0).step(0.01).onChange((value) => {
+    //   this.updateFloatUniform( 'uTestValue', value );
+    // });
+    // this.gui.add(this.params, 'uTestValue_02', 0.0, 1.0).step(0.01).onChange((value) => {
+    //   this.updateFloatUniform( 'uTestValue_02', value );
+    // });
 
     const u_allFolder = this.gui.addFolder('All Points Transform');
     u_allFolder.open();
