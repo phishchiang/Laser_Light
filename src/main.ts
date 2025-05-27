@@ -57,7 +57,7 @@ export class WebGPUApp{
     all_rotate_Y: 0,
     all_rotate_Z: 0,
     uLightIntensity: 1.0,
-    uLightColor: [1, 1, 1],
+    uLightColor: [0.106, 0.686, 0.776], // 27, 175, 198
     u_p1_X: 0.0,
     u_p1_Y: 0.5,
     u_p1_Z: 0.0,
