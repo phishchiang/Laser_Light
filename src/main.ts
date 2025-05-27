@@ -664,13 +664,13 @@ export class WebGPUApp{
       },
       {
         color: {
-          srcFactor: 'src-alpha',
-          dstFactor: 'one-minus-src-alpha',
+          srcFactor: 'one',
+          dstFactor: 'one',
           operation: 'add',
         },
         alpha: {
           srcFactor: 'one',
-          dstFactor: 'one-minus-src-alpha',
+          dstFactor: 'one',
           operation: 'add',
         },
       }
@@ -761,17 +761,13 @@ export class WebGPUApp{
 
     const commandEncoder = this.device.createCommandEncoder();
     const passEncoder = commandEncoder.beginRenderPass(this.renderPassDescriptor);
+
+    // Draw the 1st edge mesh
     passEncoder.setPipeline(this.pipeline);
-    // passEncoder.setBindGroup(0, this.uniformBindGroup);
     passEncoder.setBindGroup(0, this.sceneUniformBindGroup); // Scene-level uniforms
     passEncoder.setBindGroup(1, this.objectUniformBindGroup); // Object-level uniforms
 
     passEncoder.setVertexBuffer(0, this.sideLine_01_VerticesBuffer);
-    passEncoder.setIndexBuffer(this.loadIndexBuffer!, 'uint16');
-    passEncoder.draw(this.loadIndexCount);
-
-    // Draw the second mesh
-    passEncoder.setVertexBuffer(0, this.sideLine_02_VerticesBuffer);
     passEncoder.setIndexBuffer(this.loadIndexBuffer!, 'uint16');
     passEncoder.draw(this.loadIndexCount);
 
@@ -782,6 +778,12 @@ export class WebGPUApp{
     passEncoder.setVertexBuffer(0, this.tri_VerticesBuffer);
     passEncoder.setIndexBuffer(this.tri_IndexBuffer!, 'uint16');
     passEncoder.draw(this.tri_IndexCount);
+
+    // Draw the 2nd edge mesh
+    passEncoder.setPipeline(this.pipeline);
+    passEncoder.setVertexBuffer(0, this.sideLine_02_VerticesBuffer);
+    passEncoder.setIndexBuffer(this.loadIndexBuffer!, 'uint16');
+    passEncoder.draw(this.loadIndexCount);
 
     passEncoder.end();
     this.device.queue.submit([commandEncoder.finish()]);
