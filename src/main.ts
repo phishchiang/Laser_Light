@@ -193,7 +193,7 @@ export class WebGPUApp{
     const vertexOrder = [rightUp, leftUp, leftDown, rightUp, leftDown, rightDown];
 
     const stride = this.loadVertexLayout.arrayStride / 4; // floats per vertex
-    console.log(this.loadVertexLayout)
+    // console.log(this.loadVertexLayout)
     for (let i = 0; i < 6; i++) {
       this.sideLine_01_interVertexData[i * stride + 0] = vertexOrder[i][0];
       this.sideLine_01_interVertexData[i * stride + 1] = vertexOrder[i][1];
@@ -532,61 +532,52 @@ export class WebGPUApp{
     });
 
     const u_p1Folder = this.gui.addFolder('1st Point Position');
-    u_p1Folder.open();
+    // u_p1Folder.open();
 
     u_p1Folder.add(this.params, 'u_p1_X', -10, 10).step(0.01).onChange((value) => {
-      this.updateFloatUniform( 'u_p1_X', value );
       this.updateEdgeVertices_01();
       this.updateEdgeVertices_02();
       this.updateTriVertices();
     });
     u_p1Folder.add(this.params, 'u_p1_Y', -10, 10).step(0.01).onChange((value) => {
-      this.updateFloatUniform( 'u_p1_Y', value );
       this.updateEdgeVertices_01();
       this.updateEdgeVertices_02();
       this.updateTriVertices();
     });
     u_p1Folder.add(this.params, 'u_p1_Z', -10, 10).step(0.01).onChange((value) => {
-      this.updateFloatUniform( 'u_p1_Z', value );
       this.updateEdgeVertices_01();
       this.updateEdgeVertices_02();
       this.updateTriVertices();
     });
 
     const u_p2Folder = this.gui.addFolder('2nd Point Position');
-    u_p2Folder.open();
+    // u_p2Folder.open();
 
     u_p2Folder.add(this.params, 'u_p2_X', -10, 10).step(0.01).onChange((value) => {
-      this.updateFloatUniform( 'u_p2_X', value );
       this.updateEdgeVertices_01();
       this.updateTriVertices();
     });
     u_p2Folder.add(this.params, 'u_p2_Y', -10, 10).step(0.01).onChange((value) => {
-      this.updateFloatUniform( 'u_p2_Y', value );
       this.updateEdgeVertices_01();
       this.updateTriVertices();
     });
     u_p2Folder.add(this.params, 'u_p2_Z', -10, 10).step(0.01).onChange((value) => {
-      this.updateFloatUniform( 'u_p2_Z', value );
       this.updateEdgeVertices_01();
       this.updateTriVertices();
     });
 
     const u_p3Folder = this.gui.addFolder('3rd Point Position');
-    u_p3Folder.open();
+    // u_p3Folder.open();
 
     u_p3Folder.add(this.params, 'u_p3_X', -10, 10).step(0.01).onChange((value) => {
-      this.updateFloatUniform( 'u_p3_X', value );
       this.updateEdgeVertices_02();
       this.updateTriVertices();
     });
     u_p3Folder.add(this.params, 'u_p3_Y', -10, 10).step(0.01).onChange((value) => {
-      this.updateFloatUniform( 'u_p3_Y', value );
       this.updateEdgeVertices_02();
       this.updateTriVertices();
     });
     u_p3Folder.add(this.params, 'u_p3_Z', -10, 10).step(0.01).onChange((value) => {
-      this.updateFloatUniform( 'u_p3_Z', value );
       this.updateEdgeVertices_02();
       this.updateTriVertices();
     });
@@ -601,33 +592,6 @@ export class WebGPUApp{
         break;
       case 'uTestValue_02':
         offset = objectUniformConfig.uTestValue_02.offset * 4;;
-        break;
-      case 'u_p1_X':
-        offset = objectUniformConfig.u_p1_X.offset * 4;
-        break;
-      case 'u_p1_Y':
-        offset = objectUniformConfig.u_p1_Y.offset * 4;
-        break;
-      case 'u_p1_Z':
-        offset = objectUniformConfig.u_p1_Z.offset * 4;
-        break;
-      case 'u_p2_X':
-        offset = objectUniformConfig.u_p2_X.offset * 4;
-        break;
-      case 'u_p2_Y':
-        offset = objectUniformConfig.u_p2_Y.offset * 4;
-        break;
-      case 'u_p2_Z':
-        offset = objectUniformConfig.u_p2_Z.offset * 4;
-        break;
-      case 'u_p3_X':
-        offset = objectUniformConfig.u_p3_X.offset * 4;
-        break;
-      case 'u_p3_Y':
-        offset = objectUniformConfig.u_p3_Y.offset * 4;
-        break;
-      case 'u_p3_Z':
-        offset = objectUniformConfig.u_p3_Z.offset * 4;
         break;
       default:
         console.error(`Unknown key: ${key}`);

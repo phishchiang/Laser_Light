@@ -32,13 +32,4 @@ export const objectUniformConfig = {
         size: 1,           // Size of the test value (float)
         offset: 17,        // Offset for uTestValue_02 in the uniform buffer
     },
-    u_p1_X: { size: 1, offset: 18, },
-    u_p1_Y: { size: 1, offset: 19, },
-    u_p1_Z: { size: 1, offset: 20, },
-    u_p2_X: { size: 1, offset: 21, },
-    u_p2_Y: { size: 1, offset: 22, },
-    u_p2_Z: { size: 1, offset: 23, },
-    u_p3_X: { size: 1, offset: 24, },
-    u_p3_Y: { size: 1, offset: 25, },
-    u_p3_Z: { size: 1, offset: 26, },
 };
