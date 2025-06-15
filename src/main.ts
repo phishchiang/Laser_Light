@@ -80,9 +80,9 @@ export class WebGPUApp{
     u_p3_X: 1,
     u_p3_Y: -1,
     u_p3_Z: 0.0,
-    uGlow_Threshold: 0.5,
-    uGlow_Radius: 1.0,
-    uGlow_Intensity: 1.0,
+    uGlow_Threshold: 0.15,
+    uGlow_Radius: 15.0,
+    uGlow_Intensity: 0.08,
   };
   private uTime: number = 0.0;
   private gui: GUI;
@@ -205,7 +205,7 @@ export class WebGPUApp{
 
     // Add post-processing effects
     this.postProcessEffects.push(
-      new GrayscaleEffect(this.device, this.presentationFormat, this.sampler),
+      // new GrayscaleEffect(this.device, this.presentationFormat, this.sampler),
       new FXAAEffect(this.device, this.presentationFormat, this.sampler, [this.canvas.width, this.canvas.height]),
     );
 
@@ -575,6 +575,10 @@ export class WebGPUApp{
       format: 'depth24plus',
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
     });
+
+    // Resize the render targets
+    this.renderTarget_ping.resize(this.device, this.canvas.width, this.canvas.height, this.presentationFormat);
+    this.renderTarget_pong.resize(this.device, this.canvas.width, this.canvas.height, this.presentationFormat);
   }
 
   private initializeGUI() {
@@ -681,7 +685,20 @@ export class WebGPUApp{
       this.updateEdgeVertices_02();
       this.updateTriVertices();
     });
+
+    const glowFolder = this.gui.addFolder('Glow FX');
+    glowFolder.add(this.params, 'uGlow_Threshold', 0.0, 1.0).step(0.01).onChange(() => this.updateGlowUniforms());
+    glowFolder.add(this.params, 'uGlow_Radius', 0.1, 20.0).step(0.1).onChange(() => this.updateGlowUniforms());
+    glowFolder.add(this.params, 'uGlow_Intensity', 0.0, 1.0).step(0.01).onChange(() => this.updateGlowUniforms());
+    glowFolder.open();
     
+  }
+
+  private updateGlowUniforms() {
+    this.brightPassEffect.setThreshold(this.params.uGlow_Threshold);
+    this.blurEffectH.setRadius(this.params.uGlow_Radius);
+    this.blurEffectV.setRadius(this.params.uGlow_Radius);
+    this.addEffect.setIntensity(this.params.uGlow_Intensity);
   }
 
   private updateFloatUniform(key: keyof typeof this.params, value: number) {
@@ -896,6 +913,50 @@ export class WebGPUApp{
     return viewMatrix;
   }
 
+  private applyGlowBloom(commandEncoder: GPUCommandEncoder, lastPPOutputView: GPUTextureView) {
+    // Store the last post-processed output in the base render target for glow bloom
+    this.passThroughEffect.apply(
+      commandEncoder,
+      { A: lastPPOutputView },
+      this.renderTarget_baseOut_glow.view,
+      [this.canvas.width, this.canvas.height]
+    );
+  
+    // 1. Bright pass: extract brights from the scene
+    this.brightPassEffect.apply(
+      commandEncoder,
+      { A: this.renderTarget_baseOut_glow.view },
+      this.renderTarget_ping_glow.view,
+      // this.context.getCurrentTexture().createView(),
+      [this.canvas.width, this.canvas.height]
+    );
+
+    // 2. Blur the bright pass
+    this.blurEffectH.apply(
+      commandEncoder,
+      { A: this.renderTarget_ping_glow.view },
+      this.renderTarget_pong_glow.view,
+      // this.context.getCurrentTexture().createView(),
+      [this.canvas.width, this.canvas.height]
+    );
+
+    // 3. Blur the result (vertical)
+    this.blurEffectV.apply(
+      commandEncoder,
+      { A: this.renderTarget_pong_glow.view },
+      this.renderTarget_ping_glow.view,
+      [this.canvas.width, this.canvas.height]
+    );
+
+    // 4. Add blurred brights back to the scene
+    this.addEffect.apply(
+      commandEncoder,
+      { A: this.renderTarget_baseOut_glow.view, B: this.renderTarget_ping_glow.view},
+      this.context.getCurrentTexture().createView(),
+      [this.canvas.width, this.canvas.height]
+    );
+  }
+
   private renderFrame() {
     const now = Date.now();
     const deltaTime = (now - this.lastFrameMS) / 1000;
@@ -909,9 +970,12 @@ export class WebGPUApp{
     this.viewMatrix = this.getViewMatrix(deltaTime);
     this.device.queue.writeBuffer(this.sceneUniformBuffer, sceneUniformConfig.viewMatrix.offset * 4, this.viewMatrix.buffer, 0, this.viewMatrix.byteLength);
 
-    (this.renderPassDescriptor.colorAttachments as GPURenderPassColorAttachment[])[0].view = this.context
-    .getCurrentTexture()
-    .createView();
+    // Set up a render pass target based on post-processing effects
+    if (this.postProcessEffects.length === 0) {
+      (this.renderPassDescriptor.colorAttachments as GPURenderPassColorAttachment[])[0].view = this.context.getCurrentTexture().createView();
+    } else {
+      (this.renderPassDescriptor.colorAttachments as GPURenderPassColorAttachment[])[0].view = this.renderTarget_ping.view;
+    }
 
     // Update the depth attachment view
     this.renderPassDescriptor.depthStencilAttachment!.view = this.depthTexture.createView();
@@ -943,6 +1007,31 @@ export class WebGPUApp{
     passEncoder.draw(this.loadIndexCount);
 
     passEncoder.end();
+
+    // Apply post-processing effects if any
+    let finalOutputView = this.renderTarget_ping.view;
+    if (this.postProcessEffects.length > 0) {
+      let inputView = this.renderTarget_ping.view;
+      let outputView = this.renderTarget_pong.view;
+      for (let i = 0; i < this.postProcessEffects.length; i++) {
+        const isLast = i === this.postProcessEffects.length - 1;
+        // finalOutputView = isLast ? this.context.getCurrentTexture().createView() : outputView; // Only use single output for PostProcessEffects
+        finalOutputView = outputView; // Make sure to continue using ping-pong buffers when applying glowFX afterwards
+        this.postProcessEffects[i].apply(
+          commandEncoder,
+          { A: inputView },
+          finalOutputView,
+          [this.canvas.width, this.canvas.height]
+        );
+        if (!isLast) {
+          [inputView, outputView] = [outputView, inputView];
+        }
+      }
+      if (this.enableGlow) {
+        this.applyGlowBloom(commandEncoder, finalOutputView);
+      }
+    }
+
     this.device.queue.submit([commandEncoder.finish()]);
 
     requestAnimationFrame(this.renderFrame.bind(this));
