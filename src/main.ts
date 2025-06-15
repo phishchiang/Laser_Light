@@ -7,6 +7,16 @@ import { createInputHandler } from './input';
 import { loadAndProcessGLB } from './loadAndProcessGLB';
 import { sceneUniformConfig, objectUniformConfig } from './uniformConfig';
 import { PipelineBuilder } from './PipelineBuilder';
+import { PipelineBuilderOptions } from './PipelineBuilder';
+import { RenderTarget } from './RenderTarget';
+import { PostProcessEffect } from './postprocessing/PostProcessEffect';
+import { PassThroughEffect } from './postprocessing/PassThroughEffect';
+import { GrayscaleEffect } from './postprocessing/GrayscaleEffect';
+import { FXAAEffect } from './postprocessing/FXAAEffect';
+// Glow FX imports
+import { BrightPassEffect } from './postprocessing/BrightPassEffect';
+import { BlurEffect } from './postprocessing/GaussianBlurEffect';
+import { AddEffect } from './postprocessing/AddEffect';
 
 const MESH_PATH = '/assets/meshes/lightEdge.glb';
 const LIGHT_TRI_PATH = '/assets/meshes/lightTri.glb';
@@ -46,6 +56,9 @@ export class WebGPUApp{
     u_p3_X: number;
     u_p3_Y: number;
     u_p3_Z: number;
+    uGlow_Threshold: number;
+    uGlow_Radius: number;
+    uGlow_Intensity: number;
   } = {
     type: 'arcball',
     uTestValue: 1.0,
@@ -67,6 +80,9 @@ export class WebGPUApp{
     u_p3_X: 1,
     u_p3_Y: -1,
     u_p3_Z: 0.0,
+    uGlow_Threshold: 0.5,
+    uGlow_Radius: 1.0,
+    uGlow_Intensity: 1.0,
   };
   private uTime: number = 0.0;
   private gui: GUI;
@@ -98,6 +114,19 @@ export class WebGPUApp{
     digital: { forward: boolean, backward: boolean, left: boolean, right: boolean, up: boolean, down: boolean, };
     analog: { x: number; y: number; zoom: number; touching: boolean };
   };
+  private renderTarget_ping!: RenderTarget;
+  private renderTarget_pong!: RenderTarget;
+  private postProcessEffects: PostProcessEffect[] = [];
+  private passThroughEffect!: PassThroughEffect;
+  // Glow FX Variables
+  private renderTarget_baseOut_glow!: RenderTarget;
+  private renderTarget_ping_glow!: RenderTarget;
+  private renderTarget_pong_glow!: RenderTarget;
+  private brightPassEffect!: BrightPassEffect;
+  private blurEffectH!: BlurEffect;
+  private blurEffectV!: BlurEffect;
+  private addEffect!: AddEffect;
+  private enableGlow: boolean = true; // or control with GUI
   private static readonly CLEAR_COLOR = [0.1, 0.1, 0.1, 1.0];
   private static readonly CAMERA_POSITION = vec3.create(0.5, 0, 3);
 
@@ -125,14 +154,65 @@ export class WebGPUApp{
 
   public async setupAndRender() {
     await this.initializeWebGPU();
+    this.initRenderTargetsForPP();
     await this.initLoadAndProcessGLB();
     this.initUniformBuffer();
     await this.loadTexture();
     this.initCam();
-    this.initPipelineBindGrp(this.presentationFormat);
+    this.initPipelineBindGrp();
     this.initializeGUI();
     this.setupEventListeners();
     this.renderFrame();
+  }
+
+  private initRenderTargetsForPP() {
+    // Create ping-pong render targets
+    this.renderTarget_ping = new RenderTarget(
+      this.device,
+      this.canvas.width,
+      this.canvas.height,
+      this.presentationFormat
+    );
+    this.renderTarget_pong = new RenderTarget(
+      this.device,
+      this.canvas.width,
+      this.canvas.height,
+      this.presentationFormat
+    );
+
+    // Init 3 render targets for glow bloom effect
+    this.renderTarget_baseOut_glow = new RenderTarget(
+      this.device,
+      this.canvas.width,
+      this.canvas.height,
+      this.presentationFormat
+    );
+    this.renderTarget_ping_glow = new RenderTarget(
+      this.device,
+      this.canvas.width,
+      this.canvas.height,
+      this.presentationFormat
+    );
+    this.renderTarget_pong_glow = new RenderTarget(
+      this.device,
+      this.canvas.width,
+      this.canvas.height,
+      this.presentationFormat
+    );
+
+    // Init useful pass-through effect 
+    this.passThroughEffect = new PassThroughEffect(this.device, this.presentationFormat, this.sampler);
+
+    // Add post-processing effects
+    this.postProcessEffects.push(
+      new GrayscaleEffect(this.device, this.presentationFormat, this.sampler),
+      new FXAAEffect(this.device, this.presentationFormat, this.sampler, [this.canvas.width, this.canvas.height]),
+    );
+
+    this.brightPassEffect = new BrightPassEffect(this.device, this.presentationFormat, this.sampler, this.params.uGlow_Threshold );
+    this.blurEffectH = new BlurEffect(this.device, this.presentationFormat, this.sampler, [1.0, 0.0], [1 / this.canvas.width, 1 / this.canvas.height], this.params.uGlow_Radius );
+    this.blurEffectV = new BlurEffect(this.device, this.presentationFormat, this.sampler, [0.0, 1.0], [1 / this.canvas.width, 1 / this.canvas.height], this.params.uGlow_Radius );
+    this.addEffect = new AddEffect(this.device, this.presentationFormat, this.sampler, this.params.uGlow_Intensity );
   }
 
   private getGlobalTransformMatrix(): Float32Array {
@@ -671,56 +751,113 @@ export class WebGPUApp{
   }
 
 
-  private initPipelineBindGrp(presentationFormat: GPUTextureFormat) {
+  private initPipelineBindGrp() {
     const pipelineBuilder = new PipelineBuilder(this.device);
 
-    const { pipeline, sceneBindGroupLayout, objectBindGroupLayout } = pipelineBuilder.createPipeline(
-      presentationFormat,
-      edgeLightWGSL,
-      edgeLightWGSL,
-      {
+    // Create the scene-level bind group layout
+    const sceneBindGroupLayout = this.device.createBindGroupLayout({
+      entries: [
+        {
+          binding: 0, // Scene-level uniforms
+          visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+          buffer: { type: 'uniform' },
+        },
+      ],
+    });
+
+    // Create the object-level bind group layout
+    const objectBindGroupLayout = this.device.createBindGroupLayout({
+      entries: [
+        {
+          binding: 0, // Object-level uniforms
+          visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+          buffer: { type: 'uniform' },
+        },
+        {
+          binding: 1, // Sampler
+          visibility: GPUShaderStage.FRAGMENT,
+          sampler: { type: 'filtering' },
+        },
+        {
+          binding: 2, // Texture
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: 'float' },
+        },
+      ],
+    });
+
+
+    const edgeOptions: PipelineBuilderOptions = {
+      vertexShaderCode: edgeLightWGSL,
+      fragmentShaderCode: edgeLightWGSL,
+      vertexEntryPoint: 'vertex_main',
+      fragmentEntryPoint: 'fragment_main',
+      vertexLayout: {
         arrayStride: this.loadVertexLayout.arrayStride,
         attributes: this.loadVertexLayout.attributes,
       },
-      {
-        color: {
-          srcFactor: 'one',
-          dstFactor: 'one',
-          operation: 'add',
+      bindGroupLayouts: [sceneBindGroupLayout, objectBindGroupLayout],
+      targets: [{
+        format: this.presentationFormat,
+        blend: {
+          color: {
+            srcFactor: 'one',
+            dstFactor: 'one',
+            operation: 'add',
+          },
+          alpha: {
+            srcFactor: 'one',
+            dstFactor: 'one',
+            operation: 'add',
+          },
         },
-        alpha: {
-          srcFactor: 'one',
-          dstFactor: 'one',
-          operation: 'add',
-        },
-      }
-    );
+        writeMask: GPUColorWrite.ALL,
+      }],
+      primitive: { topology: 'triangle-list' },
+      depthStencil: {
+        format: 'depth24plus',
+        depthWriteEnabled: true,
+        depthCompare: 'less',
+      },
+    };
 
-    this.pipeline = pipeline;
+    this.pipeline = pipelineBuilder.createPipeline(edgeOptions);
 
-    // Triangle mesh pipeline
-    const { pipeline: triPipeline } = pipelineBuilder.createPipeline(
-      presentationFormat,
-      triNoiseWGSL,
-      triNoiseWGSL,
-      {
+    const triOptions: PipelineBuilderOptions = {
+      vertexShaderCode: triNoiseWGSL,
+      fragmentShaderCode: triNoiseWGSL,
+      vertexEntryPoint: 'vertex_main',
+      fragmentEntryPoint: 'fragment_main',
+      vertexLayout: {
         arrayStride: this.tri_VertexLayout.arrayStride,
         attributes: this.tri_VertexLayout.attributes,
       },
-      {
-        color: {
-          srcFactor: 'src-alpha',
-          dstFactor: 'one-minus-src-alpha',
-          operation: 'add',
+      bindGroupLayouts: [sceneBindGroupLayout, objectBindGroupLayout],
+      targets: [{
+        format: this.presentationFormat,
+        blend: {
+          color: {
+            srcFactor: 'src-alpha',
+            dstFactor: 'one-minus-src-alpha',
+            operation: 'add',
+          },
+          alpha: {
+            srcFactor: 'one',
+            dstFactor: 'one-minus-src-alpha',
+            operation: 'add',
+          },
         },
-        alpha: {
-          srcFactor: 'one',
-          dstFactor: 'one-minus-src-alpha',
-          operation: 'add',
-        },
-      }
-    );
-    this.triPipeline = triPipeline;
+        writeMask: GPUColorWrite.ALL,
+      }],
+      primitive: { topology: 'triangle-list' },
+      depthStencil: {
+        format: 'depth24plus',
+        depthWriteEnabled: true,
+        depthCompare: 'less',
+      },
+    };
+
+    this.triPipeline = pipelineBuilder.createPipeline(triOptions);
 
     // Create the scene-level uniform bind group
     this.sceneUniformBindGroup = this.device.createBindGroup({
