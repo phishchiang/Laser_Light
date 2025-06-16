@@ -16,7 +16,8 @@ import { FXAAEffect } from './postprocessing/FXAAEffect';
 // Glow FX imports
 import { BrightPassEffect } from './postprocessing/BrightPassEffect';
 import { BlurEffect } from './postprocessing/GaussianBlurEffect';
-import { AddEffect } from './postprocessing/AddEffect';
+import { GlowAddEffect } from './postprocessing/GlowAddEffect';
+import { UnrealGlowEffect } from './postprocessing/UnrealGlowEffect';
 
 const MESH_PATH = '/assets/meshes/lightEdge.glb';
 const LIGHT_TRI_PATH = '/assets/meshes/lightTri.glb';
@@ -56,6 +57,7 @@ export class WebGPUApp{
     u_p3_X: number;
     u_p3_Y: number;
     u_p3_Z: number;
+    enableGlow: boolean;
     uGlow_Threshold: number;
     uGlow_Radius: number;
     uGlow_Intensity: number;
@@ -80,9 +82,10 @@ export class WebGPUApp{
     u_p3_X: 1,
     u_p3_Y: -1,
     u_p3_Z: 0.0,
-    uGlow_Threshold: 0.15,
-    uGlow_Radius: 15.0,
-    uGlow_Intensity: 0.08,
+    enableGlow: true,
+    uGlow_Threshold: 0.25,
+    uGlow_Radius: 10.0,
+    uGlow_Intensity: 0.30,
   };
   private uTime: number = 0.0;
   private gui: GUI;
@@ -119,14 +122,11 @@ export class WebGPUApp{
   private postProcessEffects: PostProcessEffect[] = [];
   private passThroughEffect!: PassThroughEffect;
   // Glow FX Variables
-  private renderTarget_baseOut_glow!: RenderTarget;
-  private renderTarget_ping_glow!: RenderTarget;
-  private renderTarget_pong_glow!: RenderTarget;
   private brightPassEffect!: BrightPassEffect;
   private blurEffectH!: BlurEffect;
   private blurEffectV!: BlurEffect;
-  private addEffect!: AddEffect;
-  private enableGlow: boolean = true; // or control with GUI
+  private glowAddEffect!: GlowAddEffect;
+  private unrealGlowEffect!: UnrealGlowEffect;
   private static readonly CLEAR_COLOR = [0.1, 0.1, 0.1, 1.0];
   private static readonly CAMERA_POSITION = vec3.create(0.5, 0, 3);
 
@@ -180,26 +180,6 @@ export class WebGPUApp{
       this.presentationFormat
     );
 
-    // Init 3 render targets for glow bloom effect
-    this.renderTarget_baseOut_glow = new RenderTarget(
-      this.device,
-      this.canvas.width,
-      this.canvas.height,
-      this.presentationFormat
-    );
-    this.renderTarget_ping_glow = new RenderTarget(
-      this.device,
-      this.canvas.width,
-      this.canvas.height,
-      this.presentationFormat
-    );
-    this.renderTarget_pong_glow = new RenderTarget(
-      this.device,
-      this.canvas.width,
-      this.canvas.height,
-      this.presentationFormat
-    );
-
     // Init useful pass-through effect 
     this.passThroughEffect = new PassThroughEffect(this.device, this.presentationFormat, this.sampler);
 
@@ -212,7 +192,20 @@ export class WebGPUApp{
     this.brightPassEffect = new BrightPassEffect(this.device, this.presentationFormat, this.sampler, this.params.uGlow_Threshold );
     this.blurEffectH = new BlurEffect(this.device, this.presentationFormat, this.sampler, [1.0, 0.0], [1 / this.canvas.width, 1 / this.canvas.height], this.params.uGlow_Radius );
     this.blurEffectV = new BlurEffect(this.device, this.presentationFormat, this.sampler, [0.0, 1.0], [1 / this.canvas.width, 1 / this.canvas.height], this.params.uGlow_Radius );
-    this.addEffect = new AddEffect(this.device, this.presentationFormat, this.sampler, this.params.uGlow_Intensity );
+    this.glowAddEffect = new GlowAddEffect(this.device, this.presentationFormat, this.sampler, this.params.uGlow_Intensity );
+    this.unrealGlowEffect = new UnrealGlowEffect(
+      this.device,
+      this.presentationFormat,
+      this.sampler,
+      this.canvas.width,
+      this.canvas.height,
+      6, // levels, adjust as needed
+      this.brightPassEffect,
+      this.blurEffectH,
+      this.blurEffectV,
+      this.glowAddEffect,
+      this.passThroughEffect
+    );
   }
 
   private getGlobalTransformMatrix(): Float32Array {
@@ -687,9 +680,10 @@ export class WebGPUApp{
     });
 
     const glowFolder = this.gui.addFolder('Glow FX');
+    glowFolder.add(this.params, 'enableGlow').name('Enable Glow');
     glowFolder.add(this.params, 'uGlow_Threshold', 0.0, 1.0).step(0.01).onChange(() => this.updateGlowUniforms());
     glowFolder.add(this.params, 'uGlow_Radius', 0.1, 20.0).step(0.1).onChange(() => this.updateGlowUniforms());
-    glowFolder.add(this.params, 'uGlow_Intensity', 0.0, 1.0).step(0.01).onChange(() => this.updateGlowUniforms());
+    glowFolder.add(this.params, 'uGlow_Intensity', 0.0, 1.0).step(0.001).onChange(() => this.updateGlowUniforms());
     glowFolder.open();
     
   }
@@ -698,7 +692,7 @@ export class WebGPUApp{
     this.brightPassEffect.setThreshold(this.params.uGlow_Threshold);
     this.blurEffectH.setRadius(this.params.uGlow_Radius);
     this.blurEffectV.setRadius(this.params.uGlow_Radius);
-    this.addEffect.setIntensity(this.params.uGlow_Intensity);
+    this.glowAddEffect.setIntensity(this.params.uGlow_Intensity);
   }
 
   private updateFloatUniform(key: keyof typeof this.params, value: number) {
@@ -913,50 +907,6 @@ export class WebGPUApp{
     return viewMatrix;
   }
 
-  private applyGlowBloom(commandEncoder: GPUCommandEncoder, lastPPOutputView: GPUTextureView) {
-    // Store the last post-processed output in the base render target for glow bloom
-    this.passThroughEffect.apply(
-      commandEncoder,
-      { A: lastPPOutputView },
-      this.renderTarget_baseOut_glow.view,
-      [this.canvas.width, this.canvas.height]
-    );
-  
-    // 1. Bright pass: extract brights from the scene
-    this.brightPassEffect.apply(
-      commandEncoder,
-      { A: this.renderTarget_baseOut_glow.view },
-      this.renderTarget_ping_glow.view,
-      // this.context.getCurrentTexture().createView(),
-      [this.canvas.width, this.canvas.height]
-    );
-
-    // 2. Blur the bright pass
-    this.blurEffectH.apply(
-      commandEncoder,
-      { A: this.renderTarget_ping_glow.view },
-      this.renderTarget_pong_glow.view,
-      // this.context.getCurrentTexture().createView(),
-      [this.canvas.width, this.canvas.height]
-    );
-
-    // 3. Blur the result (vertical)
-    this.blurEffectV.apply(
-      commandEncoder,
-      { A: this.renderTarget_pong_glow.view },
-      this.renderTarget_ping_glow.view,
-      [this.canvas.width, this.canvas.height]
-    );
-
-    // 4. Add blurred brights back to the scene
-    this.addEffect.apply(
-      commandEncoder,
-      { A: this.renderTarget_baseOut_glow.view, B: this.renderTarget_ping_glow.view},
-      this.context.getCurrentTexture().createView(),
-      [this.canvas.width, this.canvas.height]
-    );
-  }
-
   private renderFrame() {
     const now = Date.now();
     const deltaTime = (now - this.lastFrameMS) / 1000;
@@ -1015,8 +965,13 @@ export class WebGPUApp{
       let outputView = this.renderTarget_pong.view;
       for (let i = 0; i < this.postProcessEffects.length; i++) {
         const isLast = i === this.postProcessEffects.length - 1;
-        // finalOutputView = isLast ? this.context.getCurrentTexture().createView() : outputView; // Only use single output for PostProcessEffects
-        finalOutputView = outputView; // Make sure to continue using ping-pong buffers when applying glowFX afterwards
+
+        if(!this.params.enableGlow) { // Only use single output for PostProcessEffects
+          finalOutputView = isLast ? this.context.getCurrentTexture().createView() : outputView;
+        } else { // Make sure to continue using ping-pong buffers when applying glowFX afterwards
+          finalOutputView = outputView;
+        }
+
         this.postProcessEffects[i].apply(
           commandEncoder,
           { A: inputView },
@@ -1027,8 +982,13 @@ export class WebGPUApp{
           [inputView, outputView] = [outputView, inputView];
         }
       }
-      if (this.enableGlow) {
-        this.applyGlowBloom(commandEncoder, finalOutputView);
+      
+      if (this.params.enableGlow) {
+        this.unrealGlowEffect.apply(
+          commandEncoder,
+          finalOutputView,
+          this.context.getCurrentTexture().createView()
+        );
       }
     }
 

@@ -1,8 +1,8 @@
-import addWGSL from '../shaders/add.wgsl?raw';
+import glowAddWGSL from '../shaders/glowAdd.wgsl?raw';
 import { PostProcessEffect } from './PostProcessEffect';
 import { PipelineBuilder, PipelineBuilderOptions } from '../PipelineBuilder';
 
-export class AddEffect implements PostProcessEffect {
+export class GlowAddEffect implements PostProcessEffect {
   private device: GPUDevice;
   private pipeline: GPURenderPipeline;
   private sampler: GPUSampler;
@@ -25,8 +25,8 @@ export class AddEffect implements PostProcessEffect {
     });
 
     const options: PipelineBuilderOptions = {
-      vertexShaderCode: addWGSL,
-      fragmentShaderCode: addWGSL,
+      vertexShaderCode: glowAddWGSL,
+      fragmentShaderCode: glowAddWGSL,
       vertexEntryPoint: 'vs_main',
       fragmentEntryPoint: 'fs_main',
       bindGroupLayouts: [this.bindGroupLayout],
