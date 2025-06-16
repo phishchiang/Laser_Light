@@ -40,12 +40,16 @@ fn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
   // Optional: Clamp bloom to avoid over-bright
   let bloom = min(colorB * intensity, vec4<f32>(1.0));
 
-  // // Optional: Non-linear blend (screen blend)
-  // let result = 1.0 - (1.0 - colorA) * (1.0 - bloom);
+  // Optional: Non-linear blend (screen blend)
+  var result = 1.0 - (1.0 - colorA) * (1.0 - bloom);
 
-  // Or: Additive with soft clamp
-  var result = colorA + bloom;
-  result = min(result, vec4<f32>(1.0));
+  // // Or: Additive with soft clamp
+  // var result = colorA + bloom;
+  // result = min(result, vec4<f32>(1.0));
+
+  // // Or: Additive with tonemapping (ACES or Reinhard)
+  // var result = colorA + bloom;
+  // result = result / (result + vec4<f32>(1.0));
 
   // Return
   return result;

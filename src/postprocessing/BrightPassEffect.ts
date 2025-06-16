@@ -8,9 +8,10 @@ private device: GPUDevice;
   private bindGroupLayout: GPUBindGroupLayout;
   private sampler: GPUSampler;
   private thresholdBuffer: GPUBuffer;
+  private kneeBuffer: GPUBuffer; 
   private pipelineBuilder: PipelineBuilder;
 
-  constructor(device: GPUDevice, format: GPUTextureFormat, sampler: GPUSampler, threshold: number) {
+  constructor(device: GPUDevice, format: GPUTextureFormat, sampler: GPUSampler, threshold: number, knee: number ) {
     this.device = device;
     this.sampler = sampler;
     this.pipelineBuilder = new PipelineBuilder(device);
@@ -20,6 +21,7 @@ private device: GPUDevice;
         { binding: 0, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
         { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
         { binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+        { binding: 3, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } }, 
       ],
     });
 
@@ -40,6 +42,12 @@ private device: GPUDevice;
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     device.queue.writeBuffer(this.thresholdBuffer, 0, new Float32Array([threshold]));
+
+    this.kneeBuffer = device.createBuffer({
+      size: 4,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(this.kneeBuffer, 0, new Float32Array([knee]));
 
     this.pipeline = device.createRenderPipeline({
       layout: device.createPipelineLayout({ bindGroupLayouts: [this.bindGroupLayout] }),
@@ -69,6 +77,7 @@ private device: GPUDevice;
         { binding: 0, resource: this.sampler },
         { binding: 1, resource: inputView },
         { binding: 2, resource: { buffer: this.thresholdBuffer } },
+        { binding: 3, resource: { buffer: this.kneeBuffer } },
       ],
     });
 
@@ -92,5 +101,10 @@ private device: GPUDevice;
 
   setThreshold(threshold: number): void {
     this.device.queue.writeBuffer(this.thresholdBuffer, 0, new Float32Array([threshold]));
+  }
+
+  setKnee(knee: number): void {
+    // Update the knee value in the shader
+    this.device.queue.writeBuffer(this.kneeBuffer, 0, new Float32Array([knee]));
   }
 }

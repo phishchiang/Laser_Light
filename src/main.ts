@@ -59,6 +59,7 @@ export class WebGPUApp{
     u_p3_Z: number;
     enableGlow: boolean;
     uGlow_Threshold: number;
+    uGlow_ThresholdKnee: number; 
     uGlow_Radius: number;
     uGlow_Intensity: number;
   } = {
@@ -84,6 +85,7 @@ export class WebGPUApp{
     u_p3_Z: 0.0,
     enableGlow: true,
     uGlow_Threshold: 0.25,
+    uGlow_ThresholdKnee: 0.30,
     uGlow_Radius: 10.0,
     uGlow_Intensity: 0.30,
   };
@@ -127,7 +129,7 @@ export class WebGPUApp{
   private blurEffectV!: BlurEffect;
   private glowAddEffect!: GlowAddEffect;
   private unrealGlowEffect!: UnrealGlowEffect;
-  private static readonly CLEAR_COLOR = [0.1, 0.1, 0.1, 1.0];
+  private static readonly CLEAR_COLOR = [0.0, 0.0, 0.0, 1.0];
   private static readonly CAMERA_POSITION = vec3.create(0.5, 0, 3);
 
   constructor(canvas: HTMLCanvasElement) {
@@ -189,7 +191,7 @@ export class WebGPUApp{
       new FXAAEffect(this.device, this.presentationFormat, this.sampler, [this.canvas.width, this.canvas.height]),
     );
 
-    this.brightPassEffect = new BrightPassEffect(this.device, this.presentationFormat, this.sampler, this.params.uGlow_Threshold );
+    this.brightPassEffect = new BrightPassEffect(this.device, this.presentationFormat, this.sampler, this.params.uGlow_Threshold, this.params.uGlow_ThresholdKnee);
     this.blurEffectH = new BlurEffect(this.device, this.presentationFormat, this.sampler, [1.0, 0.0], [1 / this.canvas.width, 1 / this.canvas.height], this.params.uGlow_Radius );
     this.blurEffectV = new BlurEffect(this.device, this.presentationFormat, this.sampler, [0.0, 1.0], [1 / this.canvas.width, 1 / this.canvas.height], this.params.uGlow_Radius );
     this.glowAddEffect = new GlowAddEffect(this.device, this.presentationFormat, this.sampler, this.params.uGlow_Intensity );
@@ -682,6 +684,7 @@ export class WebGPUApp{
     const glowFolder = this.gui.addFolder('Glow FX');
     glowFolder.add(this.params, 'enableGlow').name('Enable Glow');
     glowFolder.add(this.params, 'uGlow_Threshold', 0.0, 1.0).step(0.01).onChange(() => this.updateGlowUniforms());
+    glowFolder.add(this.params, 'uGlow_ThresholdKnee', 0.0, 1.0).step(0.01).onChange(() => this.updateGlowUniforms());
     glowFolder.add(this.params, 'uGlow_Radius', 0.1, 20.0).step(0.1).onChange(() => this.updateGlowUniforms());
     glowFolder.add(this.params, 'uGlow_Intensity', 0.0, 1.0).step(0.001).onChange(() => this.updateGlowUniforms());
     glowFolder.open();
@@ -690,6 +693,7 @@ export class WebGPUApp{
 
   private updateGlowUniforms() {
     this.brightPassEffect.setThreshold(this.params.uGlow_Threshold);
+    this.brightPassEffect.setKnee(this.params.uGlow_ThresholdKnee);
     this.blurEffectH.setRadius(this.params.uGlow_Radius);
     this.blurEffectV.setRadius(this.params.uGlow_Radius);
     this.glowAddEffect.setIntensity(this.params.uGlow_Intensity);
