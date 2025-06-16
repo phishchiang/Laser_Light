@@ -738,6 +738,7 @@ export class WebGPUApp{
     this.sampler = this.device.createSampler({
       magFilter: 'linear',
       minFilter: 'linear',
+      mipmapFilter: 'linear',
     });
 
 
